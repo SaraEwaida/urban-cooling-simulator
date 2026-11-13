@@ -12,7 +12,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
 | 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature; vegetation calibrated on one date, tested on another | done |
-| 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
+| 5. Interventions | Street trees, shade sails, cool roofs, cool pavement, porous paving; cooling maps and per-geohash tables | done (results pending) |
 
 ## Data (all free, no account)
 
@@ -103,6 +103,23 @@ With roof albedo from imagery and the sensor blur, before any calibration, the 8
 On the held-out day the spatial error is halved and the grass-pavement contrast error falls from 5.5 to 0.9 C. The scene-wide bias moves the other way on each day (-1.2 C on 8 July, +1.8 C on 30 June), which is the day-to-day forcing error the calibration deliberately leaves alone; a 25 km ERA5 cell does not resolve the air temperature over one neighbourhood. Two clear scenes is a small test; more summers would make it firmer.
 
 `ucs calibrate` prints the search, then baseline and tuned scores on both scenes; the tuned values are copied into `configs/encanto.yaml` by hand so the change is visible in the history.
+
+## Method (milestone 5: cooling interventions)
+
+Each scenario edits a copy of the scene, recomputes sun, shade and sky view factor when the geometry changes, and reruns the calibrated energy balance for 15 July 2023 with the same ERA5 weather. Results are differences from the baseline run.
+
+| Scenario | Where | Change |
+|---|---|---|
+| cool roofs | every roof darker than the target | albedo raised to 0.65 (reflective membrane) |
+| street trees | outer 4 m of the road surface, one tree per 12 x 12 m | 8 m crown, 8 m tall, over paving and verges; shades its surroundings and transpires (calibrated r_s,min) |
+| shade sails | parking-lot interiors (paved, off the road, at least 4 m from the lot edge) | fabric at 4 m passing 10% of direct sun; ground under it sees 30% of the sky; casts shadows beside it |
+| cool pavement | road surface | albedo raised to 0.33 (reflective coating) |
+| porous paving | paved surfaces off the road (lots, sidewalks, driveways) | moist (evaporative fraction 0.10), thermal inertia 1000 instead of 1500 |
+| combined | all of the above | |
+
+Reported for each: the area changed; the mean change at 15:00 and 05:00 over the whole scene, over street-level ground (pixels paved in the baseline), on the changed pixels and on the unchanged ones (spill-over from new shade); and the change in the daily mean and daily maximum. `outputs/geohash_interventions.csv` gives the change per geohash cell and scenario.
+
+Limits: the model gives surface temperature, not air temperature or how hot a pedestrian feels; for a new tree it reports the crown, not the shaded ground beneath it; porous paving only cools if it is wet, and is assumed moist here.
 
 ## Scene result (Encanto, 2 x 2 km)
 
@@ -199,6 +216,7 @@ ucs sun      # hourly shade and sky view factor -> data/encanto/sun.zarr, geohas
 ucs heat     # ERA5 forcing (downloaded once) and the energy balance -> data/encanto/heat.zarr, tables, figure
 ucs validate # Landsat scene, simulation at its overpass, scores and figure
 ucs calibrate # tune grass and tree transpiration on one Landsat date, score on a held-out date
+ucs interventions # six cooling scenarios against the calibrated baseline, maps and tables
 ```
 
 Outputs:
@@ -221,8 +239,13 @@ Outputs:
 - `outputs/figures/encanto_validation.png`: Landsat and simulation on one scale, their difference, and a scatter by class.
 - `outputs/calibration.json`, `outputs/calibration_grid.csv`: both scenes, baseline and tuned scores, every trial of the search.
 - `outputs/figures/encanto_validation_test.png`: the tuned model on the held-out date.
+- `outputs/interventions.csv`, `outputs/interventions.json`: area changed and temperature change per scenario.
+- `outputs/geohash_interventions.csv`: change at 15:00 and 05:00 per geohash cell and scenario.
+- `outputs/figures/encanto_interventions.png`: change maps on one diverging scale and a bar chart of the means.
 
 ## Tests
+
+Intervention tests: erosion and dilation, a shade sail shading the ground under and beside it, tree sites staying on the road edge and off roofs, cool roofs cooling roofs and changing nothing else, street trees cooling the streets, the combined scenario cooling more than any single one, and the written tables and figure.
 
 Validation tests: the sensor blur keeps the mean and has the right width, roof albedo follows roof brightness and ignores a bright skylight pixel, the search recovers a known grass resistance from synthetic "Landsat" data made by the model itself, block averaging with clouds, dominant class, recovery of a known +2 C bias, the CFMask bits and the USGS scale-factor example, and an end-to-end run with a stand-in Landsat scene checking that the simulation is taken at the overpass time.
 
@@ -252,6 +275,7 @@ src/ucs/heat.py           runs the day, geohash table, summary
 src/ucs/landsat.py        Landsat surface temperature and cloud mask from Planetary Computer
 src/ucs/validate.py       simulation at the overpass, sensor blur, block scores
 src/ucs/calibrate.py      vegetation calibration on one date, test on another
-src/ucs/plots.py          scene, sun, heat and validation figures
-src/ucs/cli.py            `ucs fetch | scene | sun | heat | validate | calibrate | all`
+src/ucs/interventions.py  cooling scenarios against the calibrated baseline
+src/ucs/plots.py          scene, sun, heat, validation and intervention figures
+src/ucs/cli.py            `ucs fetch | scene | sun | heat | validate | calibrate | interventions | all`
 ```

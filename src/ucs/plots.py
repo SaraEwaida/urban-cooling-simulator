@@ -240,3 +240,51 @@ def validation_figure(summary: dict, sim, lst, table, cfg: dict, path, label: st
     fig.suptitle(f"{cfg['name'].title()}: simulation vs Landsat at the overpass, {summary['overpass_local']} "
                  f"local (air {summary['air_temperature_at_overpass']:.1f} C){label}", fontsize=13)
     return _save(fig, path)
+
+
+def interventions_figure(table, deltas: dict, hours: list, cfg: dict, path):
+    import matplotlib.gridspec as gridspec
+
+    grid = Grid.from_config(cfg)
+    ext = _extent(grid)
+    h = cfg["interventions"]["map_hours"][0]
+    i = hours.index(h)
+    names = list(deltas)
+    lim = max(1.0, float(np.nanpercentile(np.abs(np.stack([deltas[n][i] for n in names])), 99.5)))
+    ncol = 3
+    nrow = int(np.ceil(len(names) / ncol))
+    fig = plt.figure(figsize=(15, 5.2 * nrow + 4.8), constrained_layout=True)
+    gs = gridspec.GridSpec(nrow + 1, ncol, figure=fig, height_ratios=[1] * nrow + [0.8])
+    for k, name in enumerate(names):
+        ax = fig.add_subplot(gs[k // ncol, k % ncol])
+        im = ax.imshow(deltas[name][i], cmap="RdBu_r", vmin=-lim, vmax=lim, extent=ext, interpolation="nearest")
+        row = table[table["scenario"] == name].iloc[0]
+        ax.set_title(f"{name.replace('_', ' ')}: scene {row[f'd_scene_{h:02d}h']:+.2f} C, "
+                     f"streets {row[f'd_street_{h:02d}h']:+.2f} C", fontsize=10)
+        ax.set_xlabel("km east")
+        ax.set_ylabel("km north")
+    fig.colorbar(im, ax=fig.axes[:len(names)], shrink=0.6,
+                 label=f"change in surface temperature at {h:02d}:00 (C), same scale")
+
+    ax = fig.add_subplot(gs[nrow, :])
+    series = [(f"d_scene_{h:02d}h", f"whole scene, {h:02d}:00", "#2c7fb8"),
+              (f"d_street_{h:02d}h", f"street-level ground, {h:02d}:00", "#d95f0e")]
+    for h2 in cfg["interventions"]["map_hours"][1:]:
+        series.append((f"d_scene_{h2:02d}h", f"whole scene, {h2:02d}:00", "#7570b3"))
+    x = np.arange(len(table))
+    w = 0.8 / len(series)
+    for j, (col, label, color) in enumerate(series):
+        vals = table[col].to_numpy()
+        bars = ax.bar(x + (j - (len(series) - 1) / 2) * w, vals, w * 0.92, color=color, label=label)
+        for b, v in zip(bars, vals):
+            ax.annotate(f"{v:+.1f}", (b.get_x() + b.get_width() / 2, v), ha="center",
+                        va="top" if v < 0 else "bottom", fontsize=7, xytext=(0, -2 if v < 0 else 2),
+                        textcoords="offset points")
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels([n.replace("_", " ") for n in table["scenario"]])
+    ax.set_ylabel("mean change in surface temperature (C)")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.suptitle(f"{cfg['name'].title()} cooling interventions, {cfg['sun']['date']} (blue = cooler)", fontsize=13)
+    return _save(fig, path)

@@ -1,17 +1,17 @@
 import argparse
 import json
 
-from . import calibrate, heat, plots, scene, sun, validate
+from . import calibrate, heat, interventions, plots, scene, sun, validate
 from .config import load_config, out_path
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="ucs", description="Urban cooling simulator")
-    p.add_argument("command", choices=["fetch", "scene", "sun", "heat", "validate", "calibrate", "all"],
+    p.add_argument("command", choices=["fetch", "scene", "sun", "heat", "validate", "calibrate", "interventions", "all"],
                    help="fetch: download inputs; scene: classify, write Zarr, table and figure; "
                         "sun: hourly shade and sky view factor; heat: surface energy balance; "
                         "validate: compare with Landsat; calibrate: tune vegetation on one Landsat date "
-                        "and test on another; all: scene to validation")
+                        "and test on another; interventions: cooling scenarios; all: scene to validation")
     p.add_argument("--config", default="configs/encanto.yaml")
     a = p.parse_args(argv)
     cfg = load_config(a.config)
@@ -50,6 +50,13 @@ def main(argv=None):
             for k, m in res.items():
                 print(f"  {k:10s} n={m['n']:4d}  bias {m['bias']:+6.2f}  MAE {m['mae']:5.2f}  RMSE {m['rmse']:5.2f}"
                       f"  RMSE bias removed {m['rmse_bias_removed']:5.2f}  r {m['r']:5.2f}")
+        print(f"Figure: {fig}")
+    if a.command == "interventions":
+        print(f"Cooling interventions on {cfg['sun']['date']}:")
+        table, deltas, hours, _ = interventions.run(cfg)
+        fig = plots.interventions_figure(table, deltas, hours, cfg, out_path(cfg, "interventions_figure"))
+        cols = ["scenario", "changed_ha"] + [c for c in table.columns if c.startswith("d_")]
+        print(table[cols].round(2).to_string(index=False))
         print(f"Figure: {fig}")
     if a.command == "calibrate":
         out, sims = calibrate.run(cfg)

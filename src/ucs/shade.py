@@ -34,27 +34,34 @@ def _ray_offsets(azimuth_deg: float, max_dist_m: float, res: float):
 
 
 def sunlit_fraction(building_h, tree_h, elevation_deg, azimuth_deg, res, tree_transmissivity=0.25,
-                    max_dist_m=300.0) -> np.ndarray:
+                    max_dist_m=300.0, sail_h=None, sail_transmissivity=0.1) -> np.ndarray:
     """Fraction of direct sunlight reaching each pixel's top surface (roof, canopy or ground).
 
     1 = full sun, `tree_transmissivity` = under or behind a tree crown, 0 = behind a building
-    (or the sun is below the horizon).
+    (or the sun is below the horizon). Optional shade sails (`sail_h`, height of a fabric canopy
+    over the ground) shade the ground under them and cast shadows like a thin roof that lets
+    `sail_transmissivity` through; the surface under a sail is the ground.
     """
     hb = np.nan_to_num(building_h, nan=0.0).astype("float32")
     ht = np.nan_to_num(tree_h, nan=0.0).astype("float32")
+    hs = np.zeros_like(hb) if sail_h is None else np.nan_to_num(sail_h, nan=0.0).astype("float32")
     surface = np.maximum(hb, ht)
     if elevation_deg <= 0:
         return np.zeros(surface.shape, "float32")
     tan_el = np.tan(np.radians(elevation_deg))
-    reach = min(max_dist_m, float(surface.max()) / tan_el + res)
+    reach = min(max_dist_m, float(max(surface.max(), hs.max())) / tan_el + res)
     by_building = np.zeros(surface.shape, bool)
     by_tree = np.zeros(surface.shape, bool)
+    by_sail = hs > surface  # directly under a sail
     for dy, dx, d in _ray_offsets(azimuth_deg, reach, res):
         rise = d * tan_el
         by_building |= _shifted(hb, dy, dx) - surface > rise
         by_tree |= _shifted(ht, dy, dx) - surface > rise
+        if sail_h is not None:
+            by_sail |= _shifted(hs, dy, dx) - surface > rise
     out = np.ones(surface.shape, "float32")
     out[by_tree] = tree_transmissivity
+    out[by_sail] = np.minimum(out[by_sail], sail_transmissivity)
     out[by_building] = 0.0
     return out
 

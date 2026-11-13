@@ -10,7 +10,7 @@ from . import classify as C
 from . import forcing as F
 from . import geohash
 from .config import out_path
-from .energy import SurfaceModel
+from .energy import TAU, SurfaceModel
 from .grid import Grid
 
 
@@ -41,14 +41,24 @@ def surface_properties(scene: xr.Dataset, cfg: dict) -> dict[str, np.ndarray]:
     return mats
 
 
-def build_model(scene: xr.Dataset, sun: xr.Dataset, cfg: dict, mask=None) -> SurfaceModel:
-    """The surface model for all pixels, or only those in `mask` (pixels are independent)."""
+def build_model(scene: xr.Dataset, sun: xr.Dataset, cfg: dict, mask=None, props=None, inertia=None) -> SurfaceModel:
+    """The surface model for all pixels, or only those in `mask` (pixels are independent).
+
+    `props` replaces the albedo / emissivity / evap maps; `inertia` (NaN = class default) sets the
+    thermal inertia of individual ground pixels, e.g. a paving change.
+    """
     sel = (lambda a: a[mask]) if mask is not None else (lambda a: a)
-    mats = surface_properties(scene, cfg)
+    mats = props if props is not None else surface_properties(scene, cfg)
     hc = cfg["heat"]
-    return SurfaceModel(sel(mats["albedo"]), sel(mats["emissivity"]), sel(mats["evap"]),
-                        sel(sun["sky_view_factor"].values), sel(scene["surface_class"].values), C.CODE,
-                        cfg["thermal"], hc["wind_a"], hc["wind_b"], hc["env_albedo"])
+    model = SurfaceModel(sel(mats["albedo"]), sel(mats["emissivity"]), sel(mats["evap"]),
+                         sel(sun["sky_view_factor"].values), sel(scene["surface_class"].values), C.CODE,
+                         cfg["thermal"], hc["wind_a"], hc["wind_b"], hc["env_albedo"])
+    if inertia is not None:
+        p = sel(inertia)
+        m = ~np.isnan(p) & model.restore
+        c_eff = p[m] * np.sqrt(TAU) / (2 * np.sqrt(np.pi))
+        model.C[m], model.K[m] = c_eff, c_eff * 2 * np.pi / TAU
+    return model
 
 
 def snapshot(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, t_utc: pd.Timestamp,
@@ -92,10 +102,10 @@ class SunlitByTime:
 
 
 def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, verbose=True,
-             snapshot_utc: pd.Timestamp | None = None):
+             snapshot_utc: pd.Timestamp | None = None, props=None, inertia=None):
     """Hourly surface temperature for the target day; optionally also at one exact time (e.g. an overpass)."""
     hc, sc = cfg["heat"], cfg["sun"]
-    model = build_model(scene, sun, cfg)
+    model = build_model(scene, sun, cfg, props=props, inertia=inertia)
     at = F.interpolator(forcing)
     sunlit = SunlitByTime(sun, sc["utc_offset_h"])
     off = pd.Timedelta(hours=sc["utc_offset_h"])

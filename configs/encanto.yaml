@@ -81,6 +81,10 @@ paths:
   calibration: outputs/calibration.json
   calibration_grid: outputs/calibration_grid.csv
   test_figure: outputs/figures/encanto_validation_test.png
+  interventions: outputs/interventions.csv
+  interventions_summary: outputs/interventions.json
+  geohash_interventions: outputs/geohash_interventions.csv
+  interventions_figure: outputs/figures/encanto_interventions.png
 
 # Milestone 2: sun and shade
 sun:
@@ -132,3 +136,25 @@ calibration:
   objective: rmse_bias_removed      # spatial pattern; the scene-wide bias is a day-to-day forcing error
   grass_r_s_min: [60, 120, 200, 300, 400, 500, 600, 1000]
   tree_r_s_min: [150, 225, 300, 450, 600]
+
+# Milestone 5: cooling interventions, each compared with the calibrated baseline on sun.date
+interventions:
+  scenarios: [cool_roofs, street_trees, shade_sails, cool_pavement, porous_paving, combined]
+  cool_roofs:
+    albedo: 0.65                    # white / reflective membrane; roofs already brighter keep their albedo
+  street_trees:
+    strip_m: 4                      # outer band of the road surface (parkway / sidewalk edge) where trees go
+    spacing_m: 12                   # one tree per 12 x 12 m cell along that band
+    crown_radius_m: 4               # mature shade tree, about 8 m crown
+    height_m: 8
+  shade_sails:
+    edge_m: 4                       # sails cover parking-lot interiors at least this far from the lot edge
+    height_m: 4
+    transmissivity: 0.10            # share of direct sun through the fabric
+    svf_under: 0.30                 # sky view factor of the ground under a sail
+  cool_pavement:
+    albedo: 0.33                    # reflective road coating (Phoenix Cool Pavement Program, fresh coating)
+  porous_paving:
+    evap: 0.10                      # moist after watering or rain; dry porous paving gets far less
+    thermal_inertia: 1000           # lower than dense asphalt / concrete (1500)
+  map_hours: [15, 5]

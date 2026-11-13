@@ -16,7 +16,8 @@ def day_times(sc: dict) -> tuple[pd.DatetimeIndex, pd.DatetimeIndex]:
     return local, local - pd.Timedelta(hours=sc["utc_offset_h"])
 
 
-def compute(scene: xr.Dataset, cfg: dict, verbose: bool = True) -> xr.Dataset:
+def compute(scene: xr.Dataset, cfg: dict, verbose: bool = True, sail_h=None, sail_transmissivity=0.1,
+            svf_under_sail=0.3) -> xr.Dataset:
     sc = cfg["sun"]
     res = float(scene.attrs["res_m"])
     lon, lat = cfg["center"]
@@ -27,13 +28,17 @@ def compute(scene: xr.Dataset, cfg: dict, verbose: bool = True) -> xr.Dataset:
 
     frames = []
     for t, e, a in zip(local, elev, az):
-        f = shade.sunlit_fraction(hb, ht, e, a, res, sc["tree_transmissivity"], sc["max_shadow_m"])
+        f = shade.sunlit_fraction(hb, ht, e, a, res, sc["tree_transmissivity"], sc["max_shadow_m"],
+                                  sail_h, sail_transmissivity)
         frames.append(np.round(f * 100).astype("uint8"))
         if verbose:
             print(f"  {t:%H:%M} sun elevation {e:5.1f} deg, azimuth {a:5.1f} deg, sunlit {f.mean():.0%}")
     sunlit = np.stack(frames)
     svf = shade.sky_view_factor(np.fmax(np.nan_to_num(hb), np.nan_to_num(ht)), res,
                                 sc["svf_directions"], sc["svf_radius_m"])
+    if sail_h is not None:
+        under = np.nan_to_num(sail_h) > 0
+        svf = np.where(under, np.minimum(svf, svf_under_sail), svf).astype("float32")
     hours = sunlit.astype("float32").sum(axis=0) / 100.0  # one-hour steps
 
     ds = xr.Dataset(
