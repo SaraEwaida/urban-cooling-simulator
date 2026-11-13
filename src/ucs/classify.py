@@ -76,10 +76,12 @@ def building_heights(building_ids, hag, overture_height, default: float) -> np.n
     return out
 
 
-def canopy_height(classes, hag) -> np.ndarray:
+def canopy_height(classes, hag, min_height: float = 2.0, default: float = 6.0) -> np.ndarray:
+    """Tree height on tree pixels; trees found without a usable height get `default`."""
     out = np.full(classes.shape, np.nan, dtype="float32")
     t = classes == CODE["tree"]
-    out[t] = np.where(np.isnan(hag[t]), 6.0, hag[t])
+    h = hag[t]
+    out[t] = np.where(np.isnan(h) | (h < min_height), default, h)
     return out
 
 

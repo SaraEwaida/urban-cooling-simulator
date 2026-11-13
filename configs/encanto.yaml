@@ -33,6 +33,8 @@ classify:
 
 # Fallback building height when lidar is missing: Overture height, else floors x 3.5 m, else this
 default_building_height_m: 4.0
+# Height for tree pixels with no usable height (found by darkness, or the canopy map says < 2 m)
+default_tree_height_m: 6.0
 
 # Surface properties by class (literature values for an arid city; used by the energy balance later)
 #   albedo: shortwave reflectance; emissivity: longwave; evap: relative evaporative fraction when wet

@@ -35,6 +35,7 @@ def test_classes_on_synthetic_scene(cfg, synthetic):
     assert cls[90, 30] == C.CODE["grass"]         # verge inside the buffer stays vegetation
     assert cls[75, 75] == C.CODE["water"]
     assert cls[10, 65] == C.CODE["tree"]          # dark vegetation with no height
+    assert ds["canopy_height"].values[10, 65] == cfg["default_tree_height_m"]
     assert cls[90, 10] == C.CODE["water"]         # mapped pond, even though it looks green
     assert (cls > 0).all()
 

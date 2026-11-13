@@ -38,7 +38,7 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
    - water: Overture water polygons, plus any dark pixel with negative NDVI;
    - building footprints are roof.
    With no height source at all, trees fall back to the greenest vegetation (NDVI >= 0.35) at a nominal 6 m.
-3. **Heights.** Roof height is the median lidar height inside each footprint, else the Overture height (or floors x 3.5 m), else 4 m; the canopy height map is never used for roofs. Canopy height is the vegetation height on tree pixels.
+3. **Heights.** Roof height is the median lidar height inside each footprint, else the Overture height (or floors x 3.5 m), else 4 m; the canopy height map is never used for roofs. Canopy height is the vegetation height on tree pixels, or 6 m where that is missing or under 2 m (trees found by darkness).
 4. **Materials.** Each class gets an albedo, a thermal emissivity and a relative evaporative fraction (`configs/encanto.yaml`), used by the energy balance in milestone 3.
 5. **Geohash summary.** Every pixel is tagged with its precision-8 geohash (about 38 x 19 m); the table gives class fractions, mean albedo and mean building and canopy height per cell.
 

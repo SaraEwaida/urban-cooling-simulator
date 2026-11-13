@@ -78,7 +78,8 @@ def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None,
     water = rasterize.polygons(water_df, grid) if water_df is not None else None
     classes, notes = C.classify(naip, veg_h, bid, road, cfg["classify"], water)
     b_h = C.building_heights(bid, hag, ov_h, cfg["default_building_height_m"])
-    t_h = C.canopy_height(classes, veg_h)
+    t_h = C.canopy_height(classes, veg_h, cfg["classify"]["tree_min_height_m"],
+                           cfg["default_tree_height_m"])
     mats = C.material_maps(classes, cfg["materials"])
 
     x, y = grid.coords()
