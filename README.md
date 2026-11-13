@@ -10,7 +10,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 |---|---|---|
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
-| 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | planned |
+| 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done (results pending) |
 | 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | planned |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
 
@@ -48,6 +48,26 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
 2. **Shadows.** For each hour of the chosen day (15 July 2023, 06:00-19:00 MST; Arizona does not use daylight saving) a ray is marched from every pixel towards the sun over the building and canopy height rasters. A pixel's top surface (roof, crown or ground) is in full sun, in tree shade (25% of the direct beam passes through a crown), or in building shadow. Shadows are traced up to 300 m.
 3. **Sky view factor**, the share of the sky hemisphere a surface sees, which controls how fast it cools by long-wave radiation at night: horizon angles in 32 directions out to 100 m, SVF = mean of cos^2(horizon angle). Tree crowns count as solid. Distances are measured to the near edge of the obstructing pixel; for an infinite street canyon with H/W = 1 the result at the centre matches the analytical value cos(atan(2H/W)) = 0.447 (Oke 1981) to within 0.003.
 4. The scene is treated as flat: the terrain varies by a few metres across 2 km, far less than the buildings and trees. Pixels near the scene edge do not see obstructions outside it.
+
+## Method (milestone 3: surface energy balance)
+
+Every pixel's top surface is stepped through time (5-minute steps, two spin-up days with the real weather of the preceding days, then the target day):
+
+C dTs/dt = K_abs + L_net - H - LE - storage
+
+| Term | Model |
+|---|---|
+| Absorbed sun K_abs | (1 - albedo) x [direct x sunlit share (milestone 2) + diffuse x SVF + light reflected by surroundings x (1 - SVF)] |
+| Long-wave L_net | emissivity x (L_in - sigma Ts^4); L_in = SVF x sky + (1 - SVF) x walls at air temperature; clear-sky emissivity from Brutsaert (1975) with a cloud correction |
+| Convection H | h_c (Ts - Ta), h_c = 5.7 + 3.8 u (McAdams) with a free-convection floor; u = ERA5 10 m wind x (0.2 + 0.5 x SVF), so enclosed spaces are sheltered; crowns exchange heat from both leaf sides (x2), open water uses a lake bulk coefficient (x0.35) |
+| Evaporation LE | grass and trees: rho L (qsat(Ts) - qa) / (r_a + r_s) with stomatal resistance r_s = r_s,min / (K / (K + 100)) (Jarvis 1976), so leaves close at night; other surfaces: evaporative fraction x the wet-surface rate |
+| Storage | ground (paved, bare soil, grass): force-restore (Deardorff 1978) with thermal inertia; roofs: thin slab over an air-conditioned interior (U = 0.6 W m-2 K-1, 26 C); crowns: light slab; water: 1 m slab |
+
+Weather is ERA5 from the Open-Meteo archive (free, no key): air temperature, dew point, pressure, 10 m wind, cloud cover, and direct and diffuse radiation on a horizontal surface. Radiation values are preceding-hour means and are centred on the half hour. Each step linearises the fluxes around the current surface temperature, so the update is stable for any step length.
+
+On a clear synthetic Phoenix July day (air 31-44 C, dew point 8 C, wind 3 m/s, open sky) the model gives these early-afternoon surface temperatures, in line with published Phoenix measurements: dark roof 73 C, asphalt 66 C, bare soil 57 C, irrigated grass 38 C, tree crowns 43 C (about air temperature), pond 33 C; asphalt in all-day building shadow 37 C.
+
+What it does not model: walls (only top surfaces), air temperature changes inside the neighbourhood (air comes from ERA5 for the whole scene), irrigation schedules, and heat from traffic and air conditioners.
 
 ## Scene result (Encanto, 2 x 2 km)
 
@@ -99,6 +119,7 @@ pytest -q
 ucs fetch    # Overture vectors, NAIP and lidar onto the grid (a few minutes, needs internet)
 ucs scene    # classes, heights, materials -> data/encanto/scene.zarr, geohash table, summary, figure
 ucs sun      # hourly shade and sky view factor -> data/encanto/sun.zarr, geohash table, summary, figure
+ucs heat     # ERA5 forcing (downloaded once) and the energy balance -> data/encanto/heat.zarr, tables, figure
 ```
 
 Outputs:
@@ -111,8 +132,15 @@ Outputs:
 - `outputs/geohash_sun.csv`: per-geohash sky view factor, sunlit hours (all surfaces and ground only) and shade at 09:00 and 15:00.
 - `outputs/sun_summary.json`: sun path for the day and sunlit hours and sky view factor by surface class.
 - `outputs/figures/encanto_sun.png`: shade at 09:00 and 15:00, hours of direct sun, sky view factor.
+- `data/encanto/forcing.csv`: hourly ERA5 weather for the spin-up days and the target day.
+- `data/encanto/heat.zarr`: hourly surface temperature for the target day, daily maximum, air temperature.
+- `outputs/geohash_heat.csv`: per-geohash surface temperature at 11:00, 15:00, 05:00 and the daily maximum.
+- `outputs/heat_summary.json`, `outputs/heat_by_class_hourly.csv`: temperatures and energy fluxes by surface class.
+- `outputs/figures/encanto_heat.png`: surface temperature maps (11:00 and 15:00 on one scale, 05:00) and the daily cycle by class.
 
 ## Tests
+
+Energy balance tests: a dry surface with no sun among walls at air temperature relaxes exactly to air temperature, the update stays finite with one-hour steps, the afternoon ordering of surfaces on a synthetic Phoenix day (roof > asphalt > bare soil > air > tree, grass), shade and a higher albedo both cool asphalt, vegetation stops transpiring at night, forcing parsing and the half-hour radiation shift, and an end-to-end run writing the Zarr, tables and figure.
 
 Sun and shade tests: solstice noon elevation (90 - latitude + 23.44 degrees) and Arizona solar noon, a morning sun in the east and none at night, the shadow length of a 10 m block at a 45 degree sun, partial tree shade with buildings taking precedence, sky view factor 1 on open ground and the analytical street canyon value, and the written Zarr, table and figure.
 
@@ -132,6 +160,9 @@ src/ucs/scene.py          fetch and build steps, Zarr, geohash table, summary
 src/ucs/solar.py          sun elevation and azimuth (NOAA equations)
 src/ucs/shade.py          ray-marched shadows and sky view factor
 src/ucs/sun.py            hourly shade over a day, geohash table, summary
-src/ucs/plots.py          scene and sun figures
-src/ucs/cli.py            `ucs fetch | scene | sun | all`
+src/ucs/forcing.py        ERA5 weather from Open-Meteo, time interpolation
+src/ucs/energy.py         per-pixel surface energy balance
+src/ucs/heat.py           runs the day, geohash table, summary
+src/ucs/plots.py          scene, sun and heat figures
+src/ucs/cli.py            `ucs fetch | scene | sun | heat | all`
 ```

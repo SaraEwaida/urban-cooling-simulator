@@ -37,7 +37,8 @@ default_building_height_m: 4.0
 default_tree_height_m: 6.0
 
 # Surface properties by class (literature values for an arid city; used by the energy balance later)
-#   albedo: shortwave reflectance; emissivity: longwave; evap: relative evaporative fraction when wet
+#   albedo: shortwave reflectance; emissivity: longwave; evap: evaporation as a fraction of a wet surface's
+#   (non-vegetated surfaces; grass and trees use the stomatal resistance in `thermal`)
 materials:
   roof:        {albedo: 0.20, emissivity: 0.90, evap: 0.0}
   paved:       {albedo: 0.10, emissivity: 0.95, evap: 0.0}
@@ -60,6 +61,11 @@ paths:
   geohash_sun: outputs/geohash_sun.csv
   sun_summary: outputs/sun_summary.json
   sun_figure: outputs/figures/encanto_sun.png
+  forcing: data/encanto/forcing.csv
+  heat: data/encanto/heat.zarr
+  geohash_heat: outputs/geohash_heat.csv
+  heat_summary: outputs/heat_summary.json
+  heat_figure: outputs/figures/encanto_heat.png
 
 # Milestone 2: sun and shade
 sun:
@@ -71,3 +77,27 @@ sun:
   svf_directions: 32
   svf_radius_m: 100
   map_hours: [9, 15]              # hours shown in the figure
+
+# Milestone 3: surface energy balance (same day as `sun.date`)
+heat:
+  era5_model: era5
+  spinup_days: 2                  # the same shade pattern is replayed with the real weather of the days before
+  dt_s: 300
+  wind_a: 0.2                     # local wind = ERA5 10 m wind x (a + b x sky view factor)
+  wind_b: 0.5
+  env_albedo: 0.2                 # reflectance of the surroundings seen instead of sky
+  deep_offset_c: 3.0              # initial deep-ground temperature above the mean air temperature
+  map_hours: [11, 15, 5]          # 11:00 is near the Landsat overpass (about 10:50 MST)
+
+# Heat storage by class.
+#   ground: force-restore with thermal inertia P = sqrt(conductivity x volumetric heat capacity) (J m-2 K-1 s-1/2)
+#   roof: thin slab (J m-2 K-1) over an air-conditioned interior through a U-value (W m-2 K-1)
+#   slab: a single layer of fixed heat capacity
+#   r_s_min: minimum stomatal resistance (s m-1) for vegetation; evaporation then follows light, not `evap`
+thermal:
+  roof:      {model: roof, heat_capacity: 20000, u_value: 0.6, interior_c: 26}
+  paved:     {model: ground, thermal_inertia: 1500}
+  bare_soil: {model: ground, thermal_inertia: 700}
+  grass:     {model: ground, thermal_inertia: 1400, r_s_min: 60}
+  tree:      {model: slab, heat_capacity: 15000, h_c_factor: 2.0, r_s_min: 150}
+  water:     {model: slab, heat_capacity: 4200000, h_c_factor: 0.35}   # bulk transfer over open water (C_E ~ 1.3e-3) is ~3x lower than over rough surfaces

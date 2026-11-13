@@ -139,3 +139,51 @@ def sun_figure(sun, cfg: dict, path):
     fig.suptitle(f"{cfg['name'].title()} sun and shade, {cfg['sun']['date']} ({sun.attrs['time_zone']})",
                  fontsize=13)
     return _save(fig, path)
+
+
+def heat_figure(heat, by_class, cfg: dict, path):
+    import pandas as pd
+
+    grid = Grid.from_config(cfg)
+    ext = _extent(grid)
+    fig, axes = plt.subplots(2, 2, figsize=(12, 11.5), constrained_layout=True)
+    hours = list(pd.DatetimeIndex(heat.time.values).hour)
+    ts = heat["surface_temperature"].values
+    day_h, night_h = [h for h in cfg["heat"]["map_hours"] if 8 <= h <= 18], \
+                     [h for h in cfg["heat"]["map_hours"] if not 8 <= h <= 18]
+    day = np.stack([ts[hours.index(h)] for h in day_h])
+    vmin, vmax = np.percentile(day, [1, 99])
+    for ax, h in zip([axes[0, 0], axes[0, 1]], day_h[:2]):
+        i = hours.index(h)
+        im = ax.imshow(ts[i], cmap="inferno", vmin=vmin, vmax=vmax, extent=ext, interpolation="nearest")
+        ax.set_title(f"Surface temperature {h:02d}:00 (air {float(heat.air_temperature[i]):.1f} C)")
+    fig.colorbar(im, ax=axes[0, :], shrink=0.8, label="surface temperature (C), same scale")
+    if night_h:
+        ax = axes[1, 0]
+        i = hours.index(night_h[0])
+        lo, hi = np.percentile(ts[i], [1, 99])
+        im = ax.imshow(ts[i], cmap="inferno", vmin=lo, vmax=hi, extent=ext, interpolation="nearest")
+        fig.colorbar(im, ax=ax, shrink=0.8, label="surface temperature (C), night scale")
+        ax.set_title(f"Surface temperature {night_h[0]:02d}:00 (air {float(heat.air_temperature[i]):.1f} C)")
+    for ax in [axes[0, 0], axes[0, 1], axes[1, 0]]:
+        ax.set_xlabel("km east")
+        ax.set_ylabel("km north")
+
+    ax = axes[1, 1]
+    bc = by_class.copy()
+    bc["hour"] = pd.DatetimeIndex(bc["time"]).hour
+    bc = bc.drop_duplicates(["class", "hour"])
+    for name in C.CLASSES:
+        g = bc[bc["class"] == name].sort_values("hour")
+        if len(g):
+            ax.plot(g["hour"], g["ts"], color=CLASS_COLORS[name], lw=2, label=name.replace("_", " "))
+    ax.plot(hours, heat.air_temperature.values, color="black", lw=2, ls="--", label="air (ERA5)")
+    ax.set_xlim(0, 23)
+    ax.set_xticks(range(0, 24, 3))
+    ax.set_xlabel(f"hour ({heat.attrs['time_zone']})")
+    ax.set_ylabel("mean surface temperature (C)")
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8, ncol=2)
+    ax.set_title("Daily cycle by surface class")
+    fig.suptitle(f"{cfg['name'].title()} surface temperature, {cfg['sun']['date']}", fontsize=13)
+    return _save(fig, path)
