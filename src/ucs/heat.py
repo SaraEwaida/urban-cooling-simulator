@@ -24,11 +24,57 @@ def load_forcing(cfg: dict) -> pd.DataFrame:
     return df
 
 
+def surface_properties(scene: xr.Dataset, cfg: dict) -> dict[str, np.ndarray]:
+    """Albedo, emissivity and evaporative fraction from the current config.
+
+    Read from the config rather than the copy saved with the scene, so material changes and
+    interventions take effect without rebuilding the scene. Roof albedo can come from each
+    roof's brightness in the aerial image.
+    """
+    cls = scene["surface_class"].values
+    mats = C.material_maps(cls, cfg["materials"])
+    ra = cfg.get("roof_albedo", {})
+    if ra.get("from_naip"):
+        roof = cls == C.CODE["roof"]
+        alb = C.roof_albedo(scene["naip"].values, scene["building_id"].values, ra)
+        mats["albedo"] = np.where(roof & ~np.isnan(alb), alb, mats["albedo"]).astype("float32")
+    return mats
+
+
+def build_model(scene: xr.Dataset, sun: xr.Dataset, cfg: dict, mask=None) -> SurfaceModel:
+    """The surface model for all pixels, or only those in `mask` (pixels are independent)."""
+    sel = (lambda a: a[mask]) if mask is not None else (lambda a: a)
+    mats = surface_properties(scene, cfg)
+    hc = cfg["heat"]
+    return SurfaceModel(sel(mats["albedo"]), sel(mats["emissivity"]), sel(mats["evap"]),
+                        sel(sun["sky_view_factor"].values), sel(scene["surface_class"].values), C.CODE,
+                        cfg["thermal"], hc["wind_a"], hc["wind_b"], hc["env_albedo"])
+
+
+def snapshot(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, t_utc: pd.Timestamp,
+             mask=None) -> np.ndarray:
+    """Surface temperature at one time (after the spin-up days), for all pixels or a mask of them."""
+    hc = cfg["heat"]
+    model = build_model(scene, sun, cfg, mask)
+    at = F.interpolator(forcing)
+    sunlit = SunlitByTime(sun, cfg["sun"]["utc_offset_h"], mask)
+    off = pd.Timedelta(hours=cfg["sun"]["utc_offset_h"])
+    day0 = pd.Timestamp(cfg["sun"]["date"], tz="UTC") - off
+    t = day0 - pd.Timedelta(days=hc["spinup_days"])
+    dt = float(hc["dt_s"])
+    model.init(at(t.timestamp())["temperature_2m"], hc["deep_offset_c"])
+    while (t_utc - t).total_seconds() > dt / 2:
+        model.step(at(t.timestamp()), sunlit(t), dt)
+        t += pd.Timedelta(seconds=dt)
+    return model.ts
+
+
 class SunlitByTime:
     """Sunlit fraction at any time of day, interpolated between the hourly shadow frames."""
 
-    def __init__(self, sun: xr.Dataset, utc_offset_h: float):
-        self.frames = sun["sunlit"].values.astype("float32") / 100.0
+    def __init__(self, sun: xr.Dataset, utc_offset_h: float, mask=None):
+        frames = sun["sunlit"].values
+        self.frames = (frames[:, mask] if mask is not None else frames).astype("float32") / 100.0
         t = pd.DatetimeIndex(sun.time.values)
         self.hours = (t.hour + t.minute / 60).to_numpy(dtype=float)
         self.offset = utc_offset_h
@@ -49,12 +95,7 @@ def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dic
              snapshot_utc: pd.Timestamp | None = None):
     """Hourly surface temperature for the target day; optionally also at one exact time (e.g. an overpass)."""
     hc, sc = cfg["heat"], cfg["sun"]
-    # Surface properties come from the current config (not the copy saved with the scene),
-    # so material changes and interventions take effect without rebuilding the scene
-    mats = C.material_maps(scene["surface_class"].values, cfg["materials"])
-    model = SurfaceModel(mats["albedo"], mats["emissivity"], mats["evap"],
-                         sun["sky_view_factor"].values, scene["surface_class"].values, C.CODE,
-                         cfg["thermal"], hc["wind_a"], hc["wind_b"], hc["env_albedo"])
+    model = build_model(scene, sun, cfg)
     at = F.interpolator(forcing)
     sunlit = SunlitByTime(sun, sc["utc_offset_h"])
     off = pd.Timedelta(hours=sc["utc_offset_h"])

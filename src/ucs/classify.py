@@ -93,3 +93,33 @@ def material_maps(classes, materials: dict) -> dict[str, np.ndarray]:
             lut[code] = materials[name][prop]
         maps[prop] = lut[classes]
     return maps
+
+
+def per_building_median(building_ids, values) -> np.ndarray:
+    """Median of `values` over each building footprint, broadcast back to its pixels (NaN elsewhere)."""
+    out = np.full(building_ids.shape, np.nan, dtype="float32")
+    inside = (building_ids > 0) & ~np.isnan(values)
+    if not inside.any():
+        return out
+    ids, vals = building_ids[inside], values[inside]
+    order = np.argsort(ids, kind="stable")
+    sid, sval = ids[order], vals[order]
+    starts = np.r_[0, np.flatnonzero(np.diff(sid)) + 1]
+    med = np.full(building_ids.max() + 1, np.nan, dtype="float32")
+    for s, e in zip(starts, np.r_[starts[1:], len(sid)]):
+        med[sid[s]] = np.median(sval[s:e])
+    bid = building_ids[building_ids > 0]
+    out[building_ids > 0] = med[bid]
+    return out
+
+
+def roof_albedo(naip, building_ids, p: dict) -> np.ndarray:
+    """Roof albedo from each roof's median NAIP brightness, linear between a dark and a bright anchor.
+
+    NAIP digital numbers are not calibrated reflectance, so this ranks roofs from dark shingle
+    to white membrane rather than measuring albedo; the anchors set the range.
+    """
+    b = per_building_median(building_ids, brightness(naip))
+    t = (b - p["dark_dn"]) / (p["bright_dn"] - p["dark_dn"])
+    return np.clip(p["dark_albedo"] + t * (p["bright_albedo"] - p["dark_albedo"]),
+                   min(p["dark_albedo"], p["bright_albedo"]), max(p["dark_albedo"], p["bright_albedo"])).astype("float32")

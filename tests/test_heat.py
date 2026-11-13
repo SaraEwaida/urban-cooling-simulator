@@ -119,6 +119,7 @@ def test_heat_run_end_to_end(cfg, synthetic):
 
 def test_heat_uses_current_config_materials(cfg, synthetic):
     cfg["heat"]["spinup_days"] = 1
+    cfg["roof_albedo"]["from_naip"] = False
     scene.build(cfg, **synthetic, write=True)
     sun.run(cfg, verbose=False)
     synthetic_forcing(days=3).to_csv(cfg["paths"]["forcing"], index=False)
@@ -126,3 +127,16 @@ def test_heat_uses_current_config_materials(cfg, synthetic):
     cfg["materials"]["roof"]["albedo"] = 0.65  # a cool roof, changed after the scene was built
     _, _, cool = heat.run(cfg, verbose=False)
     assert base["by_class"]["roof"]["ts_15h"] - cool["by_class"]["roof"]["ts_15h"] > 10
+
+
+def test_roof_albedo_follows_roof_brightness(cfg):
+    naip = np.zeros((4, 4, 4), "float32")
+    ids = np.zeros((4, 4), "int32")
+    ids[:2, :2], ids[2:, 2:] = 1, 2
+    naip[:3, :2, :2] = 60    # dark shingle roof
+    naip[:3, 2:, 2:] = 220   # white roof
+    naip[:3, 0, 0] = 255     # one bright pixel (a skylight) must not move the median much
+    alb = C.roof_albedo(naip, ids, cfg["roof_albedo"])
+    p = cfg["roof_albedo"]
+    assert np.isnan(alb[0, 3]) and np.allclose(alb[:2, :2], alb[0, 1])
+    assert p["dark_albedo"] <= alb[0, 1] < 0.15 < 0.55 < alb[3, 3] <= p["bright_albedo"]

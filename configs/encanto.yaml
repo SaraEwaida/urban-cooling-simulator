@@ -31,6 +31,15 @@ classify:
     service: 5
     unknown: 6
 
+# Roof albedo from each roof's median NAIP brightness (mean of R, G, B digital numbers), linear between
+# a dark shingle and a white membrane; replaces materials.roof.albedo when from_naip is true
+roof_albedo:
+  from_naip: true
+  dark_dn: 50
+  dark_albedo: 0.08
+  bright_dn: 230
+  bright_albedo: 0.70
+
 # Fallback building height when lidar is missing: Overture height, else floors x 3.5 m, else this
 default_building_height_m: 4.0
 # Height for tree pixels with no usable height (found by darkness, or the canopy map says < 2 m)
@@ -69,6 +78,9 @@ paths:
   validation: outputs/validation.json
   validation_blocks: outputs/validation_blocks.csv
   validation_figure: outputs/figures/encanto_validation.png
+  calibration: outputs/calibration.json
+  calibration_grid: outputs/calibration_grid.csv
+  test_figure: outputs/figures/encanto_validation_test.png
 
 # Milestone 2: sun and shade
 sun:
@@ -112,3 +124,10 @@ landsat:
   min_clear: 0.98                   # share of the 2 x 2 km scene that must be cloud-free
   read_res_m: 10                    # Landsat read with nearest neighbour onto a 10 m grid, then block-averaged
   compare_res_m: [100, 200]         # TIRS measures at 100 m, so no finer comparison is meaningful
+  psf_sigma_m: 40                   # Gaussian blur applied to the simulation to mimic the TIRS footprint (FWHM ~ 94 m)
+  min_gap_days: 5                   # the held-out test scene must be at least this far from the calibration scene
+
+# Calibration of vegetation transpiration against the calibration scene; scored on the held-out scene
+calibration:
+  grass_r_s_min: [60, 120, 200, 350, 600, 1000]
+  tree_r_s_min: [150, 300, 600, 1000]

@@ -44,17 +44,26 @@ def read(item, grid: Grid, read_res: float = 10.0) -> tuple[np.ndarray, np.ndarr
     return np.where(clear, lst, np.nan).astype("float32"), clear
 
 
-def best_scene(grid: Grid, cfg: dict, verbose=True):
-    """Clear scene closest to the target date: (item, lst at read_res, clear fraction)."""
+def clear_scenes(grid: Grid, cfg: dict, n: int = 1, verbose=True):
+    """The `n` clear scenes closest to the target date, at least `min_gap_days` apart.
+
+    Returns a list of (item, lst at read_res, clear fraction), closest first.
+    """
     lc = cfg["landsat"]
     target = pd.Timestamp(cfg["sun"]["date"], tz="UTC")
     items = candidates(grid, lc["window"], lc["max_scene_cloud"])
     items.sort(key=lambda it: abs(it.datetime - target))
+    found = []
     for it in items:
+        if any(abs((it.datetime - f[0].datetime).total_seconds()) < lc.get("min_gap_days", 0) * 86400 for f in found):
+            continue
         lst, clear = read(it, grid, lc["read_res_m"])
         frac = float(clear.mean())
         if verbose:
             print(f"  {it.id} {it.datetime:%Y-%m-%d %H:%M} UTC: clear over scene {frac:.0%}")
         if frac >= lc["min_clear"]:
-            return it, lst, frac
-    raise RuntimeError(f"No Landsat scene in {lc['window']} is {lc['min_clear']:.0%} clear over the scene")
+            found.append((it, lst, frac))
+            if len(found) == n:
+                return found
+    raise RuntimeError(f"Only {len(found)} of {n} Landsat scenes in {lc['window']} are "
+                       f"{lc['min_clear']:.0%} clear over the scene")

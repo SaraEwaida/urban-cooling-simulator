@@ -11,7 +11,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
-| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | done (uncalibrated baseline) |
+| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature; vegetation calibrated on one date, tested on another | done (calibration results pending) |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
 
 ## Data (all free, no account)
@@ -77,6 +77,16 @@ What it does not model: walls (only top surfaces), air temperature changes insid
 4. **Scores.** Bias (simulated - Landsat), MAE, RMSE, RMSE after removing the bias, and the correlation, for all blocks and by each block's dominant surface class.
 
 Expected differences: Landsat sees walls and the ground under crowns at an angle the model does not, uses ASTER emissivities from 2000-2008, and its own ST uncertainty is about 1-2 K; the model's air temperature and wind come from one 25 km ERA5 cell.
+
+## Method (milestone 4b: calibration on one date, test on another)
+
+The baseline above exposes two biases. They are addressed in three steps, keeping the test fair:
+
+1. **Roof albedo from imagery (no Landsat involved).** Each roof's median NAIP brightness is mapped linearly from a dark shingle (DN 50, albedo 0.08) to a white membrane (DN 230, albedo 0.70). NAIP digital numbers are not calibrated reflectance, so this ranks roofs rather than measuring them.
+2. **Sensor footprint.** Before block averaging, the 2 m simulation is blurred with a Gaussian (sigma 40 m, FWHM about 94 m) to mimic the TIRS footprint, so the model is not penalised for sharp edges Landsat cannot see.
+3. **Two-parameter calibration.** Only the minimum stomatal resistance of grass and of trees are tuned, by a coordinate search minimising the RMSE of 100 m blocks on the **calibration scene** (the clear Landsat scene closest to the simulation date). Scores are then reported on a **held-out scene** at least 5 days away that the search never saw. The energy balance has no lateral coupling, so each trial reruns only the pixels of the class being tuned.
+
+`ucs calibrate` prints the search, then baseline and tuned scores on both scenes; the tuned values are copied into `configs/encanto.yaml` by hand so the change is visible in the history.
 
 ## Scene result (Encanto, 2 x 2 km)
 
@@ -172,6 +182,7 @@ ucs scene    # classes, heights, materials -> data/encanto/scene.zarr, geohash t
 ucs sun      # hourly shade and sky view factor -> data/encanto/sun.zarr, geohash table, summary, figure
 ucs heat     # ERA5 forcing (downloaded once) and the energy balance -> data/encanto/heat.zarr, tables, figure
 ucs validate # Landsat scene, simulation at its overpass, scores and figure
+ucs calibrate # tune grass and tree transpiration on one Landsat date, score on a held-out date
 ```
 
 Outputs:
@@ -192,10 +203,12 @@ Outputs:
 - `outputs/validation.json`: Landsat scene and overpass time, scores at 100 m and 200 m, overall and by dominant class.
 - `outputs/validation_blocks.csv`: every 100 m block with simulated and Landsat temperature and its dominant class.
 - `outputs/figures/encanto_validation.png`: Landsat and simulation on one scale, their difference, and a scatter by class.
+- `outputs/calibration.json`, `outputs/calibration_grid.csv`: both scenes, baseline and tuned scores, every trial of the search.
+- `outputs/figures/encanto_validation_test.png`: the tuned model on the held-out date.
 
 ## Tests
 
-Validation tests: block averaging with clouds, dominant class, recovery of a known +2 C bias, the CFMask bits and the USGS scale-factor example, and an end-to-end run with a stand-in Landsat scene checking that the simulation is taken at the overpass time.
+Validation tests: the sensor blur keeps the mean and has the right width, roof albedo follows roof brightness and ignores a bright skylight pixel, the search recovers a known grass resistance from synthetic "Landsat" data made by the model itself, block averaging with clouds, dominant class, recovery of a known +2 C bias, the CFMask bits and the USGS scale-factor example, and an end-to-end run with a stand-in Landsat scene checking that the simulation is taken at the overpass time.
 
 Energy balance tests: a dry surface with no sun among walls at air temperature relaxes exactly to air temperature, the update stays finite with one-hour steps, the afternoon ordering of surfaces on a synthetic Phoenix day (roof > asphalt > bare soil > air > tree, grass), shade and a higher albedo both cool asphalt, vegetation stops transpiring at night, forcing parsing and the half-hour radiation shift, and an end-to-end run writing the Zarr, tables and figure.
 
@@ -221,7 +234,8 @@ src/ucs/forcing.py        ERA5 weather from Open-Meteo, time interpolation
 src/ucs/energy.py         per-pixel surface energy balance
 src/ucs/heat.py           runs the day, geohash table, summary
 src/ucs/landsat.py        Landsat surface temperature and cloud mask from Planetary Computer
-src/ucs/validate.py       simulation at the overpass, block scores
+src/ucs/validate.py       simulation at the overpass, sensor blur, block scores
+src/ucs/calibrate.py      vegetation calibration on one date, test on another
 src/ucs/plots.py          scene, sun, heat and validation figures
-src/ucs/cli.py            `ucs fetch | scene | sun | heat | validate | all`
+src/ucs/cli.py            `ucs fetch | scene | sun | heat | validate | calibrate | all`
 ```

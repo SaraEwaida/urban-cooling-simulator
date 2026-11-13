@@ -189,14 +189,14 @@ def heat_figure(heat, by_class, cfg: dict, path):
     return _save(fig, path)
 
 
-def validation_figure(summary: dict, sim, lst, table, cfg: dict, path):
-    from .validate import block_mean, block_valid_share
+def validation_figure(summary: dict, sim, lst, table, cfg: dict, path, label: str = ""):
+    from .validate import block_mean, block_valid_share, gaussian_blur
 
     grid = Grid.from_config(cfg)
     ext = _extent(grid)
     r = cfg["landsat"]["compare_res_m"][0]
     ks, ko = int(r / grid.res), int(r / cfg["landsat"]["read_res_m"])
-    s = block_mean(sim, ks)
+    s = block_mean(gaussian_blur(sim, cfg["landsat"].get("psf_sigma_m", 0) / grid.res), ks)
     o = block_mean(lst, ko)
     o = np.where(block_valid_share(lst, ko) >= 0.9, o, np.nan)
     s = np.where(np.isnan(o), np.nan, s)
@@ -206,7 +206,7 @@ def validation_figure(summary: dict, sim, lst, table, cfg: dict, path):
     for ax, a, title in [(axes[0, 0], o, f"Landsat surface temperature ({summary['platform']})"),
                          (axes[0, 1], s, "Simulated surface temperature")]:
         im = ax.imshow(a, cmap="inferno", vmin=lo, vmax=hi, extent=ext, interpolation="nearest")
-        ax.set_title(f"{title}, {r} m blocks")
+        ax.set_title(f"{title}, {r} m blocks", fontsize=10)
     fig.colorbar(im, ax=axes[0, :], shrink=0.8, label="surface temperature (C), same scale")
 
     ax = axes[1, 0]
@@ -238,5 +238,5 @@ def validation_figure(summary: dict, sim, lst, table, cfg: dict, path):
     ax.legend(fontsize=8, title="dominant class of block", title_fontsize=8)
     ax.set_title(f"{r} m blocks by dominant surface class")
     fig.suptitle(f"{cfg['name'].title()}: simulation vs Landsat at the overpass, {summary['overpass_local']} "
-                 f"local (air {summary['air_temperature_at_overpass']:.1f} C)", fontsize=13)
+                 f"local (air {summary['air_temperature_at_overpass']:.1f} C){label}", fontsize=13)
     return _save(fig, path)
