@@ -21,7 +21,7 @@ def brightness(naip: np.ndarray) -> np.ndarray:
     return naip[:3].mean(axis=0).astype("float32")
 
 
-def classify(naip, hag, building_ids, road_mask, cfg_classify: dict) -> tuple[np.ndarray, dict]:
+def classify(naip, hag, building_ids, road_mask, cfg_classify: dict, water_mask=None) -> tuple[np.ndarray, dict]:
     """Return the class raster (uint8, codes in CODE) and notes on how it was made.
 
     `hag` is vegetation height above ground (lidar or a canopy height map); NaN where unknown.
@@ -40,8 +40,13 @@ def classify(naip, hag, building_ids, road_mask, cfg_classify: dict) -> tuple[np
     out[valid & veg] = CODE["grass"]
     # Trees: tall vegetation; where no height is known, fall back to the greenest vegetation
     tall = np.where(have_lidar, hag >= c["tree_min_height_m"], v >= c.get("tree_fallback_ndvi", 0.35))
+    # Tree crowns are darker than irrigated turf (self-shading); this catches trees a canopy model misses
+    if c.get("tree_max_brightness") is not None:
+        tall = tall | (b <= c["tree_max_brightness"])
     out[valid & veg & tall] = CODE["tree"]
     water = (v <= c["water_max_ndvi"]) & (b <= c["water_max_brightness"])
+    if water_mask is not None:
+        water = water | water_mask
     out[valid & water] = CODE["water"]
     out[building_ids > 0] = CODE["roof"]
     notes = {"lidar_fraction": float(have_lidar.mean())}

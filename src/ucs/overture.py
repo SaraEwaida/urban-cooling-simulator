@@ -37,5 +37,21 @@ def fetch_roads(bbox, path: Path) -> int:
     return len(df)
 
 
+WATER_COLS = ["id", "geometry", "subtype", "class"]
+
+
+def fetch_water(bbox, path: Path) -> int:
+    """Mapped water bodies (lakes, ponds, pools); line features such as canals' centre lines are dropped."""
+    import shapely
+
+    df = _read("water", bbox, WATER_COLS).to_pandas()
+    kinds = shapely.get_type_id(shapely.from_wkb(df["geometry"].to_numpy()))
+    df = df[(kinds == 3) | (kinds == 6)].reset_index(drop=True)  # Polygon, MultiPolygon
+    pq.write_table(pa.Table.from_pandas(df, preserve_index=False), path)
+    return len(df)
+
+
 def load(path: Path) -> pd.DataFrame:
+    if not Path(path).exists():
+        return pd.DataFrame({"geometry": pd.Series([], dtype=object)})
     return pq.read_table(path).to_pandas()

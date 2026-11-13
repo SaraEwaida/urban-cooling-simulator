@@ -25,6 +25,8 @@ def fetch(cfg: dict, verbose: bool = True) -> dict:
     log(f"Overture buildings: {n}")
     n = overture.fetch_roads(bbox, out_path(cfg, "roads"))
     log(f"Overture road segments: {n}")
+    n = overture.fetch_water(bbox, out_path(cfg, "water"))
+    log(f"Overture water polygons: {n}")
 
     naip, naip_meta = imagery.fetch_naip(grid, cfg["sources"]["naip_years"])
     log(f"NAIP {naip_meta['year']}: {len(naip_meta['items'])} tile(s), {naip_meta['dates']}")
@@ -48,7 +50,7 @@ def fetch(cfg: dict, verbose: bool = True) -> dict:
     return meta
 
 
-def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None, roads_df=None,
+def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None, roads_df=None, water_df=None,
           meta: dict | None = None, write: bool = True) -> xr.Dataset:
     """Classify the surface and assemble the scene. Inputs default to the files written by fetch()."""
     grid = Grid.from_config(cfg)
@@ -60,6 +62,7 @@ def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None,
     if buildings_df is None:
         buildings_df = overture.load(out_path(cfg, "buildings"))
         roads_df = overture.load(out_path(cfg, "roads"))
+        water_df = overture.load(out_path(cfg, "water"))
     meta = meta or {}
 
     if chm is None:
@@ -72,7 +75,8 @@ def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None,
 
     bid, ov_h = rasterize.buildings(buildings_df, grid)
     road = rasterize.roads(roads_df, grid, cfg["classify"]["road_width_m"])
-    classes, notes = C.classify(naip, veg_h, bid, road, cfg["classify"])
+    water = rasterize.polygons(water_df, grid) if water_df is not None else None
+    classes, notes = C.classify(naip, veg_h, bid, road, cfg["classify"], water)
     b_h = C.building_heights(bid, hag, ov_h, cfg["default_building_height_m"])
     t_h = C.canopy_height(classes, veg_h)
     mats = C.material_maps(classes, cfg["materials"])

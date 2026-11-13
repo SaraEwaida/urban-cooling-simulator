@@ -20,12 +20,13 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 |---|---|---|
 | Building footprints and heights | Overture Maps `building` (via the `overturemaps` package) | roofs, fallback heights (height, else floors x 3.5 m) |
 | Road centre lines | Overture Maps `segment`, subtype `road` | paved surface, buffered by road class |
+| Water bodies | Overture Maps `water` (polygons) | lagoons, ponds, pools |
 | Aerial imagery, 0.6 m RGB + NIR | USDA NAIP on Microsoft Planetary Computer | NDVI, brightness, surface class |
 | Height above ground, 2 m | USGS 3DEP lidar `3dep-lidar-hag` on Planetary Computer | tree vs grass, roof heights (where available) |
 | Canopy height, about 1 m | Meta/WRI High Resolution Canopy Height Maps v1 on AWS Open Data (no account) | tree vs grass and tree height when there is no lidar |
 | Terrain | 3DEP lidar `3dep-lidar-dtm`, else Copernicus DEM GLO-30 (`cop-dem-glo-30`) on Planetary Computer | elevation |
 
-Planetary Computer is read anonymously; only the part of each cloud-optimised GeoTIFF inside the scene is downloaded, warped straight onto the grid (NAIP averaged from 0.6 m to 2 m, lidar bilinear). Planetary Computer's 3DEP lidar collection has no coverage over Phoenix (checked for the whole metro area), so for Encanto the scene uses the fallbacks: tree height from the Meta/WRI canopy height map, roof height from Overture, and terrain from the 30 m Copernicus DEM. The canopy map is a model estimate from older Maxar imagery, not a measurement, and NAIP is from 2023, so trees planted or removed in between are misclassified. The code still prefers lidar for any scene where it exists. The sources and dates used are recorded in `outputs/scene_summary.json`.
+Planetary Computer is read anonymously; only the part of each cloud-optimised GeoTIFF inside the scene is downloaded, warped straight onto the grid (NAIP averaged from 0.6 m to 2 m, lidar bilinear). Planetary Computer's 3DEP lidar collection has no coverage over Phoenix (checked for the whole metro area), so for Encanto the scene uses the fallbacks: tree height from the Meta/WRI canopy height map, roof height from Overture, and terrain from the 30 m Copernicus DEM. The canopy map is a model estimate from older Maxar imagery, not a measurement; over Encanto it gives 0 m for about three quarters of the vegetated pixels, which is why dark vegetation also counts as tree. NAIP is from 2023, so trees planted or removed in between are misclassified. The code still prefers lidar for any scene where it exists. The sources and dates used are recorded in `outputs/scene_summary.json`.
 
 ## Method (milestone 1)
 
@@ -33,8 +34,8 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
 2. **Surface classes**, applied in order so that what is visible from above wins:
    - ground: bare soil, or paved if dark (asphalt, concrete, parking lots);
    - road buffers pave unvegetated pixels (verges and canopy inside the buffer keep their class);
-   - vegetation (NDVI >= 0.20) is grass, or tree where its height (lidar, else canopy height map) is >= 2 m;
-   - water: negative NDVI and dark;
+   - vegetation (NDVI >= 0.20) is grass, or tree where its height (lidar, else canopy height map) is >= 2 m or where it is dark (mean RGB <= 70), since tree crowns are darker than irrigated turf;
+   - water: Overture water polygons, plus any dark pixel with negative NDVI;
    - building footprints are roof.
    With no height source at all, trees fall back to the greenest vegetation (NDVI >= 0.35) at a nominal 6 m.
 3. **Heights.** Roof height is the median lidar height inside each footprint, else the Overture height (or floors x 3.5 m), else 4 m; the canopy height map is never used for roofs. Canopy height is the vegetation height on tree pixels.

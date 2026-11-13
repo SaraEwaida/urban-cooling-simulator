@@ -15,7 +15,8 @@ sources:
 classify:
   tree_min_height_m: 2.0
   veg_min_ndvi: 0.20              # NAIP NDVI from raw digital numbers
-  water_max_ndvi: -0.05
+  tree_max_brightness: 70         # vegetation this dark (mean R,G,B) is tree canopy; null to disable
+  water_max_ndvi: -0.05           # spectral water rule; Overture water polygons are added to it
   water_max_brightness: 70        # mean of R,G,B (0-255)
   paved_max_brightness: 110       # darker, unvegetated ground = asphalt / concrete
   road_width_m:                   # buffer for Overture road centre lines, full width
@@ -46,6 +47,7 @@ materials:
 paths:
   buildings: data/encanto/buildings.parquet
   roads: data/encanto/roads.parquet
+  water: data/encanto/water.parquet
   rasters: data/encanto/rasters.npz
   chm_index: data/chm_tiles.geojson
   scene: data/encanto/scene.zarr

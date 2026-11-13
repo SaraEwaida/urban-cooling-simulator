@@ -51,3 +51,13 @@ def roads(df: pd.DataFrame, grid: Grid, widths: dict) -> np.ndarray:
         out_shape=grid.shape, transform=grid.transform, fill=0, dtype="uint8",
     )
     return mask.astype(bool)
+
+
+def polygons(df: pd.DataFrame, grid: Grid) -> np.ndarray:
+    """Boolean mask of polygons (e.g. water bodies)."""
+    if len(df) == 0:
+        return np.zeros(grid.shape, bool)
+    geoms = to_grid_crs(shapely.from_wkb(df["geometry"].to_numpy()), grid.crs)
+    mask = rasterize(((g, 1) for g in geoms if g is not None and not g.is_empty),
+                     out_shape=grid.shape, transform=grid.transform, fill=0, dtype="uint8")
+    return mask.astype(bool)

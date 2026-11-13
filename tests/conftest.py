@@ -32,6 +32,8 @@ def synthetic(cfg):
     naip[:] = np.array([180, 160, 140, 190], "float32")[:, None, None]  # bright bare soil, NDVI ~0.03
     naip[:, :, : nx // 2] = np.array([80, 110, 70, 200], "float32")[:, None, None]  # grass NDVI ~0.43
     naip[:, 70:80, 70:80] = np.array([30, 40, 50, 25], "float32")[:, None, None]  # dark water, NDVI < 0
+    naip[:, 5:15, 60:70] = np.array([40, 60, 35, 160], "float32")[:, None, None]  # dark green: canopy, no height
+    naip[:, 85:95, 5:15] = np.array([60, 90, 70, 110], "float32")[:, None, None]  # green-tinted pond
     hag = np.zeros((ny, nx), "float32")
     hag[10:30, 10:30] = 8.0  # tree clump
     hag[40:60, 60:80] = 7.0  # building roof
@@ -44,4 +46,8 @@ def synthetic(cfg):
                       "height": [np.nan], "num_floors": [2]})
     r = pd.DataFrame({"id": ["r1"], "geometry": [shapely.to_wkb(_wgs84(road, g.crs))],
                       "subtype": ["road"], "class": ["residential"]})
-    return dict(naip=naip, hag=hag, dtm=dtm, buildings_df=b, roads_df=r, meta={"naip": {"year": 2023}})
+    pond = shapely.box(x0 + 10, y1 - 190, x0 + 30, y1 - 170)  # rows 85-95, cols 5-15
+    w = pd.DataFrame({"id": ["w1"], "geometry": [shapely.to_wkb(_wgs84(pond, g.crs))],
+                      "subtype": ["lake"], "class": ["pond"]})
+    return dict(naip=naip, hag=hag, dtm=dtm, buildings_df=b, roads_df=r, water_df=w,
+                meta={"naip": {"year": 2023}})
