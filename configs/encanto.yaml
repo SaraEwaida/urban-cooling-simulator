@@ -129,5 +129,6 @@ landsat:
 
 # Calibration of vegetation transpiration against the calibration scene; scored on the held-out scene
 calibration:
-  grass_r_s_min: [60, 120, 200, 350, 600, 1000]
-  tree_r_s_min: [150, 300, 600, 1000]
+  objective: rmse_bias_removed      # spatial pattern; the scene-wide bias is a day-to-day forcing error
+  grass_r_s_min: [60, 120, 200, 300, 400, 500, 600, 1000]
+  tree_r_s_min: [150, 225, 300, 450, 600]

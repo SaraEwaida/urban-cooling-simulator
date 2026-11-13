@@ -86,6 +86,10 @@ The baseline above exposes two biases. They are addressed in three steps, keepin
 2. **Sensor footprint.** Before block averaging, the 2 m simulation is blurred with a Gaussian (sigma 40 m, FWHM about 94 m) to mimic the TIRS footprint, so the model is not penalised for sharp edges Landsat cannot see.
 3. **Two-parameter calibration.** Only the minimum stomatal resistance of grass and of trees are tuned, by a coordinate search minimising the RMSE of 100 m blocks on the **calibration scene** (the clear Landsat scene closest to the simulation date). Scores are then reported on a **held-out scene** at least 5 days away that the search never saw. The energy balance has no lateral coupling, so each trial reruns only the pixels of the class being tuned.
 
+**First attempt: plain RMSE overfits the day.** With the search minimising plain RMSE on 8 July, it chose grass 600 and tree 300 s/m and cut 8 July's RMSE from 3.82 to 1.47 C, but the held-out 30 June scene got worse (MAE 1.98 -> 2.78 C, bias +0.14 -> +2.75 C). The untuned class biases explain why: every class, including pavement, was about 2 C too cool on 8 July and about 1 C too warm on 30 June, a scene-wide offset that changes with the day's ERA5 forcing. Tuned on plain RMSE, the vegetation parameters absorbed 8 July's offset. What does repeat across dates is the contrast: grass blocks are about 5.5 C too cool *relative to pavement* on both days. The search therefore minimises the RMSE after removing the scene-wide bias, and the bias is reported separately as a forcing error.
+
+With roof albedo from imagery and the sensor blur, before any calibration, the 8 July scores improved from the baseline above: correlation 0.90 -> 0.95, RMSE with bias removed 4.17 -> 2.53 C, roof bias +4.3 -> -1.9 C and roof correlation 0.46 -> 0.80.
+
 `ucs calibrate` prints the search, then baseline and tuned scores on both scenes; the tuned values are copied into `configs/encanto.yaml` by hand so the change is visible in the history.
 
 ## Scene result (Encanto, 2 x 2 km)

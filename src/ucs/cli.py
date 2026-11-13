@@ -62,7 +62,8 @@ def main(argv=None):
                 m = out[f"{label}_scene"][k]["metrics"]["100m"]
                 by = ", ".join(f"{c} {m[c]['bias']:+.1f}" for c in ("paved", "grass", "roof", "tree") if c in m)
                 print(f"  {label:11s} {k:8s}: MAE {m['all']['mae']:.2f}  RMSE {m['all']['rmse']:.2f}  "
-                      f"bias {m['all']['bias']:+.2f}  r {m['all']['r']:.2f}  | class bias: {by}")
+                      f"bias {m['all']['bias']:+.2f}  RMSE bias removed {m['all']['rmse_bias_removed']:.2f}  "
+                      f"r {m['all']['r']:.2f}  | class bias: {by}")
         print(f"Figure (held-out date): {fig}")
 
 

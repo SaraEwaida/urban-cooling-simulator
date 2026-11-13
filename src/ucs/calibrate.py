@@ -1,8 +1,10 @@
 """Calibrate vegetation transpiration on one Landsat scene and test on another.
 
 Only two parameters are tuned: the minimum stomatal resistance of grass and of trees. The
-search is a coordinate search (grass first, then trees) minimising the RMSE of 100 m blocks
-on the calibration scene. Pixels are independent in the energy balance, so each trial reruns
+search is a coordinate search (grass first, then trees) on the calibration scene. The default
+objective is the RMSE of 100 m blocks after removing the scene-wide bias: a whole-scene offset
+varies from day to day with the ERA5 forcing, and vegetation parameters tuned on plain RMSE
+absorb that day's offset instead of fixing the vegetation-versus-pavement contrast. Pixels are independent in the energy balance, so each trial reruns
 only the pixels of the class being tuned. The held-out scene is scored once, before and after.
 """
 import json
@@ -25,6 +27,7 @@ def search(case: Case, cfg: dict, verbose=True):
     baseline = current
     best = {"thermal.grass.r_s_min": cfg["thermal"]["grass"]["r_s_min"],
             "thermal.tree.r_s_min": cfg["thermal"]["tree"]["r_s_min"]}
+    obj = cal.get("objective", "rmse_bias_removed")
     rows = []
     for key, values, name in [("thermal.grass.r_s_min", cal["grass_r_s_min"], "grass"),
                               ("thermal.tree.r_s_min", cal["tree_r_s_min"], "tree")]:
@@ -35,11 +38,12 @@ def search(case: Case, cfg: dict, verbose=True):
             res, _ = case.score(sim)
             m = res["100m"]["all"]
             cm = res["100m"].get(name, {})
-            rows.append({"parameter": key, "value": v, "rmse": m["rmse"], "mae": m["mae"], "bias": m["bias"],
+            rows.append({"parameter": key, "value": v, "objective": m[obj], "rmse": m["rmse"],
+                         "rmse_bias_removed": m["rmse_bias_removed"], "mae": m["mae"], "bias": m["bias"],
                          f"bias_{name}_blocks": cm.get("bias", np.nan), **{k: val for k, val in best.items() if k != key}})
-            trials.append((m["rmse"], v, sim))
+            trials.append((m[obj], v, sim))
             if verbose:
-                print(f"  {name} r_s_min {v:5g} s/m: RMSE {m['rmse']:.2f}  bias {m['bias']:+.2f}"
+                print(f"  {name} r_s_min {v:5g} s/m: {obj} {m[obj]:.2f}  RMSE {m['rmse']:.2f}  bias {m['bias']:+.2f}"
                       f"  {name}-block bias {cm.get('bias', float('nan')):+.2f}")
         _, v_best, current = min(trials, key=lambda x: x[0])
         best[key] = v_best
