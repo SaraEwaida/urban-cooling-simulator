@@ -65,7 +65,7 @@ C dTs/dt = K_abs + L_net - H - LE - storage
 
 Weather is ERA5 from the Open-Meteo archive (free, no key): air temperature, dew point, pressure, 10 m wind, cloud cover, and direct and diffuse radiation on a horizontal surface. Radiation values are preceding-hour means and are centred on the half hour. Each step linearises the fluxes around the current surface temperature, so the update is stable for any step length.
 
-On a clear synthetic Phoenix July day (air 31-44 C, dew point 8 C, wind 3 m/s, open sky) the model gives these early-afternoon surface temperatures, in line with published Phoenix measurements: dark roof 73 C, asphalt 66 C, bare soil 57 C, irrigated grass 38 C, tree crowns 43 C (about air temperature), pond 33 C; asphalt in all-day building shadow 37 C.
+On a clear synthetic Phoenix July day (air 31-44 C, dew point 8 C, wind 3 m/s, open sky) the model gives these early-afternoon surface temperatures, in line with published Phoenix measurements: dark roof 73 C, asphalt 66 C, bare soil 64 C, irrigated grass 38 C, tree crowns 43 C (about air temperature), pond 33 C; asphalt in all-day building shadow 37 C.
 
 What it does not model: walls (only top surfaces), air temperature changes inside the neighbourhood (air comes from ERA5 for the whole scene), irrigation schedules, and heat from traffic and air conditioners.
 

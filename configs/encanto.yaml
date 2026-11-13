@@ -42,7 +42,7 @@ default_tree_height_m: 6.0
 materials:
   roof:        {albedo: 0.20, emissivity: 0.90, evap: 0.0}
   paved:       {albedo: 0.10, emissivity: 0.95, evap: 0.0}
-  bare_soil:   {albedo: 0.28, emissivity: 0.92, evap: 0.05}
+  bare_soil:   {albedo: 0.28, emissivity: 0.92, evap: 0.005}  # unirrigated soil in July is close to dry
   grass:       {albedo: 0.23, emissivity: 0.98, evap: 0.80}
   tree:        {albedo: 0.17, emissivity: 0.98, evap: 0.60}
   water:       {albedo: 0.07, emissivity: 0.98, evap: 1.00}
