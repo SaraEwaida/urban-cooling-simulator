@@ -9,7 +9,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | Milestone | Content | State |
 |---|---|---|
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
-| 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done (results pending) |
+| 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | planned |
 | 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | planned |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
@@ -63,6 +63,24 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
 | water | 0.8% |
 
 3,104 buildings (median roof height 4.6 m, 95th percentile 30.7 m) and 6,756 geohash cells. The park lawns and golf course are grass, the lagoon and its channels are water, and tree canopy follows the residential yards, street rows and park paths. Sources: NAIP 2023-09-17, Overture building, road and water layers, Meta/WRI canopy height map (no 3DEP lidar over Phoenix on Planetary Computer), Copernicus DEM.
+
+## Sun and shade result (15 July 2023)
+
+![Encanto sun and shade](docs/encanto_sun.png)
+
+The sun rises in the east-north-east and peaks at 77 degrees just after 12:30 MST. At 09:00 buildings shadow 4% of the scene and trees shade 10%; at 15:00, 2% and 7%; at 06:00 and 19:00, long shadows leave only 38% and 47% in full sun.
+
+| Surface | Hours of direct sun (06:00-19:00, max 14) | Sky view factor |
+|---|---|---|
+| roof | 13.1 | 0.95 |
+| tree crown | 12.3 | 0.84 |
+| water | 11.9 | 0.86 |
+| grass | 11.1 | 0.77 |
+| paved | 10.9 | 0.78 |
+| bare soil | 10.5 | 0.75 |
+| scene mean | 11.4 | 0.81 |
+
+Roofs are almost always in full sun with open sky, which is why cool roofs are one of the interventions in milestone 5. Ground surfaces lose about 2-3 hours of sun to buildings and trees, and see a quarter less sky, so they keep more heat at night.
 
 ## Setup
 

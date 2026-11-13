@@ -22,6 +22,22 @@ CLASS_COLORS = {
 }
 
 
+def _save(fig, path):
+    """Save, or save next to it if Windows has the file locked (e.g. open in a viewer)."""
+    from pathlib import Path
+
+    path = Path(path)
+    try:
+        fig.savefig(path, dpi=110)
+    except OSError:
+        alt = path.with_name(f"{path.stem}_new{path.suffix}")
+        fig.savefig(alt, dpi=110)
+        print(f"{path} is open in another program; saved {alt} instead")
+        path = alt
+    plt.close(fig)
+    return path
+
+
 def _extent(grid: Grid):
     x0, y0, x1, y1 = grid.bounds
     return [(x0 - x0) / 1000, (x1 - x0) / 1000, 0, (y1 - y0) / 1000]
@@ -83,9 +99,7 @@ def scene_figure(ds, cfg: dict, path, table=None):
         ax.set_ylabel("km north")
     fig.suptitle(f"{cfg['name'].title()} scene, {grid.nx * grid.res / 1000:g} x {grid.ny * grid.res / 1000:g} km, "
                  f"{grid.crs}", fontsize=13)
-    fig.savefig(path, dpi=110)
-    plt.close(fig)
-    return path
+    return _save(fig, path)
 
 
 def sun_figure(sun, cfg: dict, path):
@@ -124,6 +138,4 @@ def sun_figure(sun, cfg: dict, path):
         ax.set_ylabel("km north")
     fig.suptitle(f"{cfg['name'].title()} sun and shade, {cfg['sun']['date']} ({sun.attrs['time_zone']})",
                  fontsize=13)
-    fig.savefig(path, dpi=110)
-    plt.close(fig)
-    return path
+    return _save(fig, path)
