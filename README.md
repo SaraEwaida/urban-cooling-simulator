@@ -11,7 +11,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
-| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature; vegetation calibrated on one date, tested on another | done (calibration results pending) |
+| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature; vegetation calibrated on one date, tested on another | done |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
 
 ## Data (all free, no account)
@@ -90,6 +90,18 @@ The baseline above exposes two biases. They are addressed in three steps, keepin
 
 With roof albedo from imagery and the sensor blur, before any calibration, the 8 July scores improved from the baseline above: correlation 0.90 -> 0.95, RMSE with bias removed 4.17 -> 2.53 C, roof bias +4.3 -> -1.9 C and roof correlation 0.46 -> 0.80.
 
+**Result.** Calibration scene Landsat 9, 8 July 2023 11:03 MST; held-out scene Landsat 8, 30 June 2023 11:03 MST (24 July was cloudy over the scene). The search chose grass r_s,min = 400 s/m (was 60) and kept trees at 150 s/m; these are now in `configs/encanto.yaml`.
+
+| 100 m blocks | Calibration 8 July, before | after | **Held-out 30 June, before** | **after** |
+|---|---|---|---|---|
+| RMSE, scene bias removed (C) | 2.53 | 1.35 | 2.47 | **1.20** |
+| MAE (C) | 2.89 | 1.39 | 1.98 | 1.90 |
+| Scene bias (C) | -2.86 | -1.18 | +0.14 | +1.75 |
+| Correlation | 0.95 | 0.95 | 0.95 | 0.95 |
+| Grass bias minus pavement bias (C) | -5.5 | -0.8 | -5.5 | -0.9 |
+
+On the held-out day the spatial error is halved and the grass-pavement contrast error falls from 5.5 to 0.9 C. The scene-wide bias moves the other way on each day (-1.2 C on 8 July, +1.8 C on 30 June), which is the day-to-day forcing error the calibration deliberately leaves alone; a 25 km ERA5 cell does not resolve the air temperature over one neighbourhood. Two clear scenes is a small test; more summers would make it firmer.
+
 `ucs calibrate` prints the search, then baseline and tuned scores on both scenes; the tuned values are copied into `configs/encanto.yaml` by hand so the change is visible in the history.
 
 ## Scene result (Encanto, 2 x 2 km)
@@ -125,7 +137,7 @@ The sun rises in the east-north-east and peaks at 77 degrees just after 12:30 MS
 
 Roofs are almost always in full sun with open sky, which is why cool roofs are one of the interventions in milestone 5. Ground surfaces lose about 2-3 hours of sun to buildings and trees, and see a quarter less sky, so they keep more heat at night.
 
-## Surface temperature result (15 July 2023)
+## Surface temperature result (15 July 2023, before calibration)
 
 ![Encanto surface temperature](docs/encanto_heat.png)
 

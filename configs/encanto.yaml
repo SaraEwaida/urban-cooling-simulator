@@ -113,8 +113,8 @@ thermal:
   roof:      {model: roof, heat_capacity: 20000, u_value: 0.6, interior_c: 26}
   paved:     {model: ground, thermal_inertia: 1500}
   bare_soil: {model: ground, thermal_inertia: 700}
-  grass:     {model: ground, thermal_inertia: 1400, r_s_min: 60}
-  tree:      {model: slab, heat_capacity: 15000, h_c_factor: 2.0, r_s_min: 150}
+  grass:     {model: ground, thermal_inertia: 1400, r_s_min: 400}   # calibrated on Landsat 2023-07-08 (was 60)
+  tree:      {model: slab, heat_capacity: 15000, h_c_factor: 2.0, r_s_min: 150}   # calibration kept 150
   water:     {model: slab, heat_capacity: 4200000, h_c_factor: 0.35}   # bulk transfer over open water (C_E ~ 1.3e-3) is ~3x lower than over rough surfaces
 
 # Milestone 4: validation against Landsat 8/9 Collection 2 surface temperature
