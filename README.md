@@ -12,7 +12,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
 | 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature; vegetation calibrated on one date, tested on another | done |
-| 5. Interventions | Street trees, shade sails, cool roofs, cool pavement, porous paving; cooling maps and per-geohash tables | done (results pending) |
+| 5. Interventions | Street trees, shade sails, cool roofs, cool pavement, porous paving; cooling maps and per-geohash tables | done |
 
 ## Data (all free, no account)
 
@@ -195,6 +195,30 @@ What this shows:
 - **Irrigated turf is 8 C too cool.** Landsat sees the park and golf course at 45-55 C; the model's turf transpires too freely at midday (minimum stomatal resistance 60 s/m), and block edges mix in paths and trees.
 - **Roofs are 4 C too hot.** Every roof has the same albedo (0.20), but many Phoenix roofs are light tile or white.
 - **Landsat is smoother than the simulation**: TIRS integrates over roughly 100 m with a blurred footprint, so sharp park edges and small hot roofs are spread out in the Landsat image but not in 100 m block means.
+
+## Intervention result (15 July 2023)
+
+![Cooling interventions](docs/encanto_interventions.png)
+
+Change in surface temperature against the calibrated baseline (negative = cooler). "Streets" is all ground paved in the baseline (roads, sidewalks, lots); "per ha" is the whole-scene cooling at 15:00 divided by the hectares changed.
+
+| Scenario | Area changed | Scene 15:00 | Streets 15:00 | Changed pixels 15:00 | Scene 05:00 | Daily mean | Scene cooling per ha changed |
+|---|---|---|---|---|---|---|---|
+| street trees (12,541 trees) | 52.9 ha | -2.58 | **-6.44** | -21.16 | -0.33 | -1.24 | **0.049** |
+| shade sails | 5.3 ha | -0.20 | -0.53 | -14.46 | +0.01 | -0.09 | 0.038 |
+| porous paving (moist) | 61.9 ha | -1.69 | -4.50 | -10.94 | **-0.84** | -1.11 | 0.027 |
+| cool roofs | 63.0 ha | -1.44 | 0.00 | -9.16 | 0.00 | -0.66 | 0.023 |
+| cool pavement | 88.6 ha | -1.43 | -3.79 | -6.44 | -0.20 | -0.70 | 0.016 |
+| combined | 222.4 ha | **-6.46** | **-12.89** | -11.79 | -1.21 | -3.31 | 0.029 |
+
+What it shows:
+
+- **Street trees cool the most per hectare.** One tree per 12 m along both edges of every street adds 13 percentage points of canopy, taking the scene from 12% to about 25% canopy, the level Phoenix's Tree and Shade Master Plan aims for. A crown replacing asphalt is about 21 C cooler at 15:00, and street-level ground cools by 6.4 C on average.
+- **Shade has a night-time cost.** Pixels near new trees are 0.6 C warmer at 05:00, and ground under sails is 0.8 C warmer, because the canopy hides the cold night sky and slows the wind. This is the known trade-off of urban shade, and the model reproduces it.
+- **Cool roofs cool roofs only.** They lower the scene mean as much as cool pavement but leave street-level ground unchanged, because the model has no air between surfaces; in reality part of the benefit would reach the street through cooler air.
+- **Porous paving is the only option that also cools the night** (-5.4 C on the changed pixels at 05:00), but only because it is assumed moist; dry porous paving would do far less.
+- **Cool pavement** gives a smaller but certain gain over the largest area (-6.4 C on treated roads).
+- **The combined effect is less than the sum** of the five (-6.5 C against -7.3 C), because new crowns cover road edges that cool pavement would otherwise treat.
 
 ## Setup
 
