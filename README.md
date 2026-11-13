@@ -42,6 +42,21 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
 4. **Materials.** Each class gets an albedo, a thermal emissivity and a relative evaporative fraction (`configs/encanto.yaml`), used by the energy balance in milestone 3.
 5. **Geohash summary.** Every pixel is tagged with its precision-8 geohash (about 38 x 19 m); the table gives class fractions, mean albedo and mean building and canopy height per cell.
 
+## Scene result (Encanto, 2 x 2 km)
+
+![Encanto scene](docs/encanto_scene.png)
+
+| Class | Share |
+|---|---|
+| paved (roads, parking, driveways) | 37.6% |
+| grass | 19.5% |
+| roof | 16.0% |
+| bare soil | 13.7% |
+| tree | 12.3% |
+| water | 0.8% |
+
+3,104 buildings (median roof height 4.6 m, 95th percentile 30.7 m) and 6,756 geohash cells. The park lawns and golf course are grass, the lagoon and its channels are water, and tree canopy follows the residential yards, street rows and park paths. Sources: NAIP 2023-09-17, Overture building, road and water layers, Meta/WRI canopy height map (no 3DEP lidar over Phoenix on Planetary Computer), Copernicus DEM.
+
 ## Setup
 
 ```powershell
