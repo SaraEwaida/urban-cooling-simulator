@@ -1,0 +1,53 @@
+# Encanto, central Phoenix: Encanto Park and lagoon, tree-lined historic residential streets,
+# the 7th/15th Avenue commercial corridors, and the AZMet Phoenix Encanto station.
+name: encanto
+center: [-112.090, 33.477]        # lon, lat (WGS84)
+size_m: 2000                      # square scene, metres
+res_m: 2                          # grid resolution (matches the 3DEP lidar rasters)
+crs: EPSG:32612                   # UTM 12N
+geohash_precision: 8              # ~38 m x 19 m cells for summaries
+
+sources:
+  naip_years: [2023, 2021, 2019]  # most recent NAIP flight covering the scene is used
+  lidar_collection: 3dep-lidar-hag
+
+# Surface classes and how they are recognised (applied in this order; later rules override earlier ones)
+classify:
+  tree_min_height_m: 2.0
+  veg_min_ndvi: 0.20              # NAIP NDVI from raw digital numbers
+  water_max_ndvi: -0.05
+  water_max_brightness: 70        # mean of R,G,B (0-255)
+  paved_max_brightness: 110       # darker, unvegetated ground = asphalt / concrete
+  road_width_m:                   # buffer for Overture road centre lines, full width
+    motorway: 24
+    trunk: 20
+    primary: 18
+    secondary: 14
+    tertiary: 12
+    residential: 9
+    unclassified: 8
+    living_street: 7
+    service: 5
+    unknown: 6
+
+# Fallback building height when lidar is missing: Overture height, else floors x 3.5 m, else this
+default_building_height_m: 4.0
+
+# Surface properties by class (literature values for an arid city; used by the energy balance later)
+#   albedo: shortwave reflectance; emissivity: longwave; evap: relative evaporative fraction when wet
+materials:
+  roof:        {albedo: 0.20, emissivity: 0.90, evap: 0.0}
+  paved:       {albedo: 0.10, emissivity: 0.95, evap: 0.0}
+  bare_soil:   {albedo: 0.28, emissivity: 0.92, evap: 0.05}
+  grass:       {albedo: 0.23, emissivity: 0.98, evap: 0.80}
+  tree:        {albedo: 0.17, emissivity: 0.98, evap: 0.60}
+  water:       {albedo: 0.07, emissivity: 0.98, evap: 1.00}
+
+paths:
+  buildings: data/encanto/buildings.parquet
+  roads: data/encanto/roads.parquet
+  rasters: data/encanto/rasters.npz
+  scene: data/encanto/scene.zarr
+  geohash_table: outputs/geohash_cells.csv
+  scene_summary: outputs/scene_summary.json
+  scene_figure: outputs/figures/encanto_scene.png
