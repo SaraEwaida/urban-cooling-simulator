@@ -154,23 +154,23 @@ The sun rises in the east-north-east and peaks at 77 degrees just after 12:30 MS
 
 Roofs are almost always in full sun with open sky, which is why cool roofs are one of the interventions in milestone 5. Ground surfaces lose about 2-3 hours of sun to buildings and trees, and see a quarter less sky, so they keep more heat at night.
 
-## Surface temperature result (15 July 2023, before calibration)
+## Surface temperature result (15 July 2023, calibrated)
 
 ![Encanto surface temperature](docs/encanto_heat.png)
 
-ERA5 air temperature ranged from 32.8 C (06:00) to 47.3 C (17:00); passing cloud cut the direct sun at 12:00-13:00 and 15:00-16:00, which shows as midday dips in the dry surfaces.
+ERA5 air temperature ranged from 32.8 C (06:00) to 47.3 C (17:00); passing cloud cut the direct sun at 12:00-13:00 and 15:00-16:00, which shows as midday dips in the dry surfaces. Roof albedo comes from the aerial image and grass transpiration from the Landsat calibration.
 
 | Surface | 05:00 | 11:00 | 15:00 | Daily max | Main heat loss at 15:00 (W m-2) |
 |---|---|---|---|---|---|
-| roof | 27.6 | 72.7 | 67.2 | 72.7 | convection 299, long-wave 244 |
 | paved | 36.4 | 61.5 | 65.2 | 66.1 | convection 248, long-wave 223 |
 | bare soil | 32.9 | 62.9 | 62.1 | 66.0 | convection 206, long-wave 189 |
+| roof | 27.6 | 64.9 | 61.7 | 65.1 | convection 219, long-wave 201 |
+| grass | 33.6 | 47.7 | 48.0 | 49.7 | evaporation 339 |
 | tree crown | 29.6 | 43.0 | 42.2 | 43.2 | evaporation 611 |
-| grass | 31.6 | 38.8 | 37.2 | 39.4 | evaporation 598 |
 | water | 33.7 | 34.4 | 35.8 | 36.1 | evaporation 356 |
-| scene mean | 32.7 | 56.6 | 56.6 | | |
+| scene mean | 33.1 | 57.1 | 57.8 | | |
 
-The park is about 25 C cooler than the surrounding streets in the afternoon; grass and crowns run below air temperature and even take heat from the air (negative convection). At night the pattern turns over: light roofs cool fastest (radiating to a dry sky, 6 C below air), while asphalt stays above air temperature from the heat it stored during the day, the usual night-time urban heat island signature.
+In the afternoon the park's turf is about 17 C cooler than the streets around it, and tree crowns, which transpire freely, stay 4 C below air temperature and take heat from the air. At night the pattern turns over: roofs, with little heat storage, radiate to the dry sky and fall 6 C below air temperature, while asphalt stays 3 C above it from the heat it stored during the day, the usual night-time urban heat island signature.
 
 ## Validation result (Landsat 9, 8 July 2023, 11:03 MST)
 
