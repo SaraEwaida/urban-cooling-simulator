@@ -47,7 +47,10 @@ class SunlitByTime:
 
 def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, verbose=True):
     hc, sc = cfg["heat"], cfg["sun"]
-    model = SurfaceModel(scene["albedo"].values, scene["emissivity"].values, scene["evap"].values,
+    # Surface properties come from the current config (not the copy saved with the scene),
+    # so material changes and interventions take effect without rebuilding the scene
+    mats = C.material_maps(scene["surface_class"].values, cfg["materials"])
+    model = SurfaceModel(mats["albedo"], mats["emissivity"], mats["evap"],
                          sun["sky_view_factor"].values, scene["surface_class"].values, C.CODE,
                          cfg["thermal"], hc["wind_a"], hc["wind_b"], hc["env_albedo"])
     at = F.interpolator(forcing)

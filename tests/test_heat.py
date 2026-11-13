@@ -115,3 +115,14 @@ def test_heat_run_end_to_end(cfg, synthetic):
     assert {"mean_ts_11h", "mean_ts_15h", "mean_ts_05h", "mean_ts_max"} <= set(table.columns)
     path = plots.heat_figure(ds, by_class, cfg, cfg["paths"]["heat_figure"])
     assert Path(path).read_bytes()[:4] == b"\x89PNG"
+
+
+def test_heat_uses_current_config_materials(cfg, synthetic):
+    cfg["heat"]["spinup_days"] = 1
+    scene.build(cfg, **synthetic, write=True)
+    sun.run(cfg, verbose=False)
+    synthetic_forcing(days=3).to_csv(cfg["paths"]["forcing"], index=False)
+    _, _, base = heat.run(cfg, verbose=False)
+    cfg["materials"]["roof"]["albedo"] = 0.65  # a cool roof, changed after the scene was built
+    _, _, cool = heat.run(cfg, verbose=False)
+    assert base["by_class"]["roof"]["ts_15h"] - cool["by_class"]["roof"]["ts_15h"] > 10
