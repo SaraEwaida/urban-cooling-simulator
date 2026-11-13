@@ -45,7 +45,9 @@ class SunlitByTime:
         return (1 - w) * self.frames[i] + w * self.frames[i + 1]
 
 
-def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, verbose=True):
+def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dict, verbose=True,
+             snapshot_utc: pd.Timestamp | None = None):
+    """Hourly surface temperature for the target day; optionally also at one exact time (e.g. an overpass)."""
     hc, sc = cfg["heat"], cfg["sun"]
     # Surface properties come from the current config (not the copy saved with the scene),
     # so material changes and interventions take effect without rebuilding the scene
@@ -64,6 +66,7 @@ def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dic
     model.init(at(start.timestamp())["temperature_2m"], hc["deep_offset_c"])
     cls = scene["surface_class"].values
     out_t, frames, air, class_rows = [], [], [], []
+    snap = None
     t = start
     while t <= end:
         f = at(t.timestamp())
@@ -79,6 +82,8 @@ def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dic
                                        **{k: float(np.asarray(v)[m].mean()) for k, v in terms.items()}})
             if verbose and out_t[-1].hour % 3 == 0:
                 print(f"  {out_t[-1]:%H:%M}  air {f['temperature_2m']:5.1f} C  surface mean {model.ts.mean():5.1f} C")
+        if snapshot_utc is not None and abs((t - snapshot_utc).total_seconds()) <= dt / 2 and snap is None:
+            snap = (t, model.ts.copy(), f["temperature_2m"])
         model.step(f, sunlit(t), dt)
         t += pd.Timedelta(seconds=dt)
 
@@ -93,6 +98,9 @@ def simulate(scene: xr.Dataset, sun: xr.Dataset, forcing: pd.DataFrame, cfg: dic
     )
     for v in ("surface_temperature", "surface_temperature_max", "air_temperature"):
         ds[v].attrs["units"] = "degC"
+    if snap is not None:
+        ds["surface_temperature_snapshot"] = (("y", "x"), snap[1])
+        ds["surface_temperature_snapshot"].attrs.update(units="degC", time_utc=str(snap[0]), air_temperature=snap[2])
     return ds, pd.DataFrame(class_rows)
 
 

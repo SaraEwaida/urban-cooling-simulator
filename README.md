@@ -11,7 +11,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
-| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | planned |
+| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | done (results pending) |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
 
 ## Data (all free, no account)
@@ -68,6 +68,15 @@ Weather is ERA5 from the Open-Meteo archive (free, no key): air temperature, dew
 On a clear synthetic Phoenix July day (air 31-44 C, dew point 8 C, wind 3 m/s, open sky) the model gives these early-afternoon surface temperatures, in line with published Phoenix measurements: dark roof 73 C, asphalt 66 C, bare soil 64 C, irrigated grass 38 C, tree crowns 43 C (about air temperature), pond 33 C; asphalt in all-day building shadow 37 C.
 
 What it does not model: walls (only top surfaces), air temperature changes inside the neighbourhood (air comes from ERA5 for the whole scene), irrigation schedules, and heat from traffic and air conditioners.
+
+## Method (milestone 4: validation against Landsat)
+
+1. **Scene.** Landsat 8 and 9 Collection 2 Level-2 surface temperature (ST_B10, scaled DN x 0.00341802 + 149 K) from Planetary Computer. Of the scenes in the search window with under 20% cloud, the one closest to the simulation date that is at least 98% clear over the 2 x 2 km scene (CFMask: no fill, cloud, dilated cloud, cirrus or shadow) is used.
+2. **Simulation at the overpass.** Sun and shade, ERA5 forcing and the energy balance are rerun for the Landsat date and the surface temperature is taken at the overpass time (about 10:50 MST), without overwriting the main-day outputs.
+3. **Matching resolution.** Landsat ST is delivered at 30 m but measured by TIRS at 100 m, so both are averaged to 100 m and 200 m blocks (2 m simulation pixels and Landsat read at 10 m with nearest neighbour). Blocks less than 90% clear are dropped.
+4. **Scores.** Bias (simulated - Landsat), MAE, RMSE, RMSE after removing the bias, and the correlation, for all blocks and by each block's dominant surface class.
+
+Expected differences: Landsat sees walls and the ground under crowns at an angle the model does not, uses ASTER emissivities from 2000-2008, and its own ST uncertainty is about 1-2 K; the model's air temperature and wind come from one 25 km ERA5 cell.
 
 ## Scene result (Encanto, 2 x 2 km)
 
@@ -138,6 +147,7 @@ ucs fetch    # Overture vectors, NAIP and lidar onto the grid (a few minutes, ne
 ucs scene    # classes, heights, materials -> data/encanto/scene.zarr, geohash table, summary, figure
 ucs sun      # hourly shade and sky view factor -> data/encanto/sun.zarr, geohash table, summary, figure
 ucs heat     # ERA5 forcing (downloaded once) and the energy balance -> data/encanto/heat.zarr, tables, figure
+ucs validate # Landsat scene, simulation at its overpass, scores and figure
 ```
 
 Outputs:
@@ -155,8 +165,13 @@ Outputs:
 - `outputs/geohash_heat.csv`: per-geohash surface temperature at 11:00, 15:00, 05:00 and the daily maximum.
 - `outputs/heat_summary.json`, `outputs/heat_by_class_hourly.csv`: temperatures and energy fluxes by surface class.
 - `outputs/figures/encanto_heat.png`: surface temperature maps (11:00 and 15:00 on one scale, 05:00) and the daily cycle by class.
+- `outputs/validation.json`: Landsat scene and overpass time, scores at 100 m and 200 m, overall and by dominant class.
+- `outputs/validation_blocks.csv`: every 100 m block with simulated and Landsat temperature and its dominant class.
+- `outputs/figures/encanto_validation.png`: Landsat and simulation on one scale, their difference, and a scatter by class.
 
 ## Tests
+
+Validation tests: block averaging with clouds, dominant class, recovery of a known +2 C bias, the CFMask bits and the USGS scale-factor example, and an end-to-end run with a stand-in Landsat scene checking that the simulation is taken at the overpass time.
 
 Energy balance tests: a dry surface with no sun among walls at air temperature relaxes exactly to air temperature, the update stays finite with one-hour steps, the afternoon ordering of surfaces on a synthetic Phoenix day (roof > asphalt > bare soil > air > tree, grass), shade and a higher albedo both cool asphalt, vegetation stops transpiring at night, forcing parsing and the half-hour radiation shift, and an end-to-end run writing the Zarr, tables and figure.
 
@@ -181,6 +196,8 @@ src/ucs/sun.py            hourly shade over a day, geohash table, summary
 src/ucs/forcing.py        ERA5 weather from Open-Meteo, time interpolation
 src/ucs/energy.py         per-pixel surface energy balance
 src/ucs/heat.py           runs the day, geohash table, summary
-src/ucs/plots.py          scene, sun and heat figures
-src/ucs/cli.py            `ucs fetch | scene | sun | heat | all`
+src/ucs/landsat.py        Landsat surface temperature and cloud mask from Planetary Computer
+src/ucs/validate.py       simulation at the overpass, block scores
+src/ucs/plots.py          scene, sun, heat and validation figures
+src/ucs/cli.py            `ucs fetch | scene | sun | heat | validate | all`
 ```

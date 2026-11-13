@@ -1,15 +1,16 @@
 import argparse
 import json
 
-from . import heat, plots, scene, sun
+from . import heat, plots, scene, sun, validate
 from .config import load_config, out_path
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="ucs", description="Urban cooling simulator")
-    p.add_argument("command", choices=["fetch", "scene", "sun", "heat", "all"],
+    p.add_argument("command", choices=["fetch", "scene", "sun", "heat", "validate", "all"],
                    help="fetch: download inputs; scene: classify, write Zarr, table and figure; "
-                        "sun: hourly shade and sky view factor; heat: surface energy balance; all: every step")
+                        "sun: hourly shade and sky view factor; heat: surface energy balance; "
+                        "validate: compare with Landsat; all: every step")
     p.add_argument("--config", default="configs/encanto.yaml")
     a = p.parse_args(argv)
     cfg = load_config(a.config)
@@ -38,6 +39,17 @@ def main(argv=None):
         fig = plots.heat_figure(ds, by_class, cfg, out_path(cfg, "heat_figure"))
         print(json.dumps({k: s[k] for k in ("air_temperature", "by_class", "scene_mean")}, indent=2))
         print(f"Heat: {cfg['paths']['heat']}\nFigure: {fig}")
+    if a.command in ("validate", "all"):
+        s, sim, lst, table = validate.run(cfg)
+        fig = plots.validation_figure(s, sim, lst, table, cfg, out_path(cfg, "validation_figure"))
+        print(json.dumps({k: s[k] for k in ("landsat_item", "overpass_local", "clear_share",
+                                             "landsat_scene_mean", "sim_scene_mean")}, indent=2))
+        for r, res in s["metrics"].items():
+            print(f"{r} blocks:")
+            for k, m in res.items():
+                print(f"  {k:10s} n={m['n']:4d}  bias {m['bias']:+6.2f}  MAE {m['mae']:5.2f}  RMSE {m['rmse']:5.2f}"
+                      f"  RMSE bias removed {m['rmse_bias_removed']:5.2f}  r {m['r']:5.2f}")
+        print(f"Figure: {fig}")
 
 
 if __name__ == "__main__":

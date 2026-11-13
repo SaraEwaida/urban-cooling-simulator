@@ -66,6 +66,9 @@ paths:
   geohash_heat: outputs/geohash_heat.csv
   heat_summary: outputs/heat_summary.json
   heat_figure: outputs/figures/encanto_heat.png
+  validation: outputs/validation.json
+  validation_blocks: outputs/validation_blocks.csv
+  validation_figure: outputs/figures/encanto_validation.png
 
 # Milestone 2: sun and shade
 sun:
@@ -101,3 +104,11 @@ thermal:
   grass:     {model: ground, thermal_inertia: 1400, r_s_min: 60}
   tree:      {model: slab, heat_capacity: 15000, h_c_factor: 2.0, r_s_min: 150}
   water:     {model: slab, heat_capacity: 4200000, h_c_factor: 0.35}   # bulk transfer over open water (C_E ~ 1.3e-3) is ~3x lower than over rough surfaces
+
+# Milestone 4: validation against Landsat 8/9 Collection 2 surface temperature
+landsat:
+  window: "2023-06-01/2023-09-15"   # search window; the clear scene closest to sun.date is used
+  max_scene_cloud: 20               # whole-scene cloud cover filter (%)
+  min_clear: 0.98                   # share of the 2 x 2 km scene that must be cloud-free
+  read_res_m: 10                    # Landsat read with nearest neighbour onto a 10 m grid, then block-averaged
+  compare_res_m: [100, 200]         # TIRS measures at 100 m, so no finer comparison is meaningful

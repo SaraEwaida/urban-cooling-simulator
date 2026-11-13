@@ -187,3 +187,56 @@ def heat_figure(heat, by_class, cfg: dict, path):
     ax.set_title("Daily cycle by surface class")
     fig.suptitle(f"{cfg['name'].title()} surface temperature, {cfg['sun']['date']}", fontsize=13)
     return _save(fig, path)
+
+
+def validation_figure(summary: dict, sim, lst, table, cfg: dict, path):
+    from .validate import block_mean, block_valid_share
+
+    grid = Grid.from_config(cfg)
+    ext = _extent(grid)
+    r = cfg["landsat"]["compare_res_m"][0]
+    ks, ko = int(r / grid.res), int(r / cfg["landsat"]["read_res_m"])
+    s = block_mean(sim, ks)
+    o = block_mean(lst, ko)
+    o = np.where(block_valid_share(lst, ko) >= 0.9, o, np.nan)
+    s = np.where(np.isnan(o), np.nan, s)
+    lo, hi = np.nanpercentile(np.r_[s.ravel(), o.ravel()], [1, 99])
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 11.5), constrained_layout=True)
+    for ax, a, title in [(axes[0, 0], o, f"Landsat surface temperature ({summary['platform']})"),
+                         (axes[0, 1], s, "Simulated surface temperature")]:
+        im = ax.imshow(a, cmap="inferno", vmin=lo, vmax=hi, extent=ext, interpolation="nearest")
+        ax.set_title(f"{title}, {r} m blocks")
+    fig.colorbar(im, ax=axes[0, :], shrink=0.8, label="surface temperature (C), same scale")
+
+    ax = axes[1, 0]
+    d = s - o
+    lim = float(np.nanpercentile(np.abs(d), 98))
+    im = ax.imshow(d, cmap="RdBu_r", vmin=-lim, vmax=lim, extent=ext, interpolation="nearest")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="simulated - Landsat (C)")
+    m = summary["metrics"][f"{r}m"]["all"]
+    ax.set_title(f"Difference: bias {m['bias']:+.1f} C, MAE {m['mae']:.1f} C, r {m['r']:.2f}")
+    for a in (axes[0, 0], axes[0, 1], axes[1, 0]):
+        a.set_xlabel("km east")
+        a.set_ylabel("km north")
+
+    ax = axes[1, 1]
+    for name in C.CLASSES:
+        g = table[table["dominant_class"] == name]
+        if len(g):
+            ax.scatter(g["landsat"], g["sim"], s=14, color=CLASS_COLORS[name], edgecolor="white", linewidth=0.4,
+                       label=f"{name.replace('_', ' ')} ({len(g)})")
+    both = np.r_[table["landsat"], table["sim"]]
+    a0, a1 = both.min() - 1, both.max() + 1
+    ax.plot([a0, a1], [a0, a1], color="black", lw=1, ls="--", label="1:1")
+    ax.set_xlim(a0, a1)
+    ax.set_ylim(a0, a1)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Landsat (C)")
+    ax.set_ylabel("simulated (C)")
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8, title="dominant class of block", title_fontsize=8)
+    ax.set_title(f"{r} m blocks by dominant surface class")
+    fig.suptitle(f"{cfg['name'].title()}: simulation vs Landsat at the overpass, {summary['overpass_local']} "
+                 f"local (air {summary['air_temperature_at_overpass']:.1f} C)", fontsize=13)
+    return _save(fig, path)
