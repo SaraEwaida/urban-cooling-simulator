@@ -11,7 +11,7 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 | 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
 | 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | done |
-| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | done (results pending) |
+| 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | done (uncalibrated baseline) |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
 
 ## Data (all free, no account)
@@ -128,6 +128,30 @@ ERA5 air temperature ranged from 32.8 C (06:00) to 47.3 C (17:00); passing cloud
 | scene mean | 32.7 | 56.6 | 56.6 | | |
 
 The park is about 25 C cooler than the surrounding streets in the afternoon; grass and crowns run below air temperature and even take heat from the air (negative convection). At night the pattern turns over: light roofs cool fastest (radiating to a dry sky, 6 C below air), while asphalt stays above air temperature from the heat it stored during the day, the usual night-time urban heat island signature.
+
+## Validation result (Landsat 9, 8 July 2023, 11:03 MST)
+
+![Simulation vs Landsat](docs/encanto_validation.png)
+
+Scene `LC09_L2SP_037037_20230708_02_T1`, 100% clear over the study area, air temperature 38.6 C at the overpass. Scene mean: Landsat 57.1 C, simulation 55.7 C. No parameter was tuned to Landsat for these scores.
+
+| 100 m blocks (dominant class) | n | Bias (sim - Landsat) | MAE | RMSE | RMSE, bias removed | r |
+|---|---|---|---|---|---|---|
+| all | 400 | -1.38 | 2.92 | 4.39 | 4.17 | 0.90 |
+| paved | 283 | +0.15 | 1.35 | 1.79 | 1.78 | 0.71 |
+| grass | 74 | -8.41 | 8.41 | 8.83 | 2.71 | 0.68 |
+| roof | 21 | +4.26 | 4.33 | 5.26 | 3.09 | 0.46 |
+| tree | 12 | -3.92 | 3.92 | 4.97 | 3.06 | 0.60 |
+| bare soil | 8 | -0.04 | 1.53 | 1.96 | 1.96 | 0.58 |
+
+At 200 m blocks: bias -1.38 C, MAE 2.41 C, r 0.93 (n = 100).
+
+What this shows:
+
+- **Streets, parking and yards** (70% of blocks) are reproduced to within Landsat's own uncertainty: bias +0.2 C, MAE 1.4 C.
+- **Irrigated turf is 8 C too cool.** Landsat sees the park and golf course at 45-55 C; the model's turf transpires too freely at midday (minimum stomatal resistance 60 s/m), and block edges mix in paths and trees.
+- **Roofs are 4 C too hot.** Every roof has the same albedo (0.20), but many Phoenix roofs are light tile or white.
+- **Landsat is smoother than the simulation**: TIRS integrates over roughly 100 m with a blurred footprint, so sharp park edges and small hot roofs are spread out in the Landsat image but not in 100 m block means.
 
 ## Setup
 
