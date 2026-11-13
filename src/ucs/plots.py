@@ -61,8 +61,8 @@ def scene_figure(ds, cfg: dict, path, table=None):
     ax.set_facecolor("#f2f2f2")
     im = ax.imshow(h, cmap="viridis", vmin=0, vmax=np.nanpercentile(h, 99), extent=ext, interpolation="nearest")
     fig.colorbar(im, ax=ax, shrink=0.8, label="height above ground (m)")
-    src = "3DEP lidar" if ds.attrs.get("lidar_fraction", 0) > 0.5 else "Overture / defaults (no lidar)"
-    ax.set_title(f"Building and canopy height ({src})")
+    roof_src = "lidar" if ds.attrs.get("lidar_fraction", 0) > 0.5 else "Overture"
+    ax.set_title(f"Height: roofs from {roof_src}, trees from {ds.attrs.get('canopy_source', 'none')}", fontsize=10)
 
     # 4. Tree cover per geohash cell
     ax = axes[1, 1]

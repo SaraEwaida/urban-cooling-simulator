@@ -47,6 +47,7 @@ paths:
   buildings: data/encanto/buildings.parquet
   roads: data/encanto/roads.parquet
   rasters: data/encanto/rasters.npz
+  chm_index: data/chm_tiles.geojson
   scene: data/encanto/scene.zarr
   geohash_table: outputs/geohash_cells.csv
   scene_summary: outputs/scene_summary.json

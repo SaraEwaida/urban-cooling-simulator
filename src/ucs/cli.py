@@ -20,7 +20,7 @@ def main(argv=None):
         fig = plots.scene_figure(ds, cfg, out_path(cfg, "scene_figure"))
         with open(cfg["paths"]["scene_summary"], encoding="utf-8") as f:
             s = json.load(f)
-        print(json.dumps({k: s[k] for k in ("valid_fraction", "lidar_fraction", "class_fractions",
+        print(json.dumps({k: s[k] for k in ("valid_fraction", "lidar_fraction", "canopy_source", "class_fractions",
                                              "buildings", "building_height_m", "geohash_cells")}, indent=2))
         print(f"Scene: {cfg['paths']['scene']}\nFigure: {fig}")
 

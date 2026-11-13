@@ -30,34 +30,51 @@ def fetch(cfg: dict, verbose: bool = True) -> dict:
     log(f"NAIP {naip_meta['year']}: {len(naip_meta['items'])} tile(s), {naip_meta['dates']}")
     hag, hag_meta = imagery.fetch_lidar(grid, cfg["sources"]["lidar_collection"])
     log(f"Lidar height above ground: coverage {hag_meta['coverage']:.0%}, {hag_meta['items']}")
+    chm = np.full(grid.shape, np.nan, dtype="float32")
+    chm_meta = {"tiles": [], "coverage": 0.0}
+    if hag_meta["coverage"] < 0.5:
+        chm, chm_meta = imagery.fetch_canopy_height(grid, out_path(cfg, "chm_index"))
+        log(f"Meta/WRI canopy height (lidar fallback): coverage {chm_meta['coverage']:.0%}, tiles {chm_meta['tiles']}")
     dtm, dtm_meta = imagery.fetch_lidar(grid, "3dep-lidar-dtm")
-    log(f"Lidar terrain model: coverage {dtm_meta['coverage']:.0%}")
+    if dtm_meta["coverage"] < 0.5:
+        dtm, dtm_meta = imagery.fetch_lidar(grid, "cop-dem-glo-30")
+        dtm_meta["source"] = "cop-dem-glo-30"
+    log(f"Terrain ({dtm_meta.get('source', '3dep-lidar-dtm')}): coverage {dtm_meta['coverage']:.0%}")
 
-    meta = {"naip": naip_meta, "hag": hag_meta, "dtm": dtm_meta,
+    meta = {"naip": naip_meta, "hag": hag_meta, "chm": chm_meta, "dtm": dtm_meta,
             "fetched_utc": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    np.savez_compressed(out_path(cfg, "rasters"), naip=naip, hag=hag, dtm=dtm,
+    np.savez_compressed(out_path(cfg, "rasters"), naip=naip, hag=hag, chm=chm, dtm=dtm,
                         meta=np.array(json.dumps(meta)))
     return meta
 
 
-def build(cfg: dict, naip=None, hag=None, dtm=None, buildings_df=None, roads_df=None,
+def build(cfg: dict, naip=None, hag=None, dtm=None, chm=None, buildings_df=None, roads_df=None,
           meta: dict | None = None, write: bool = True) -> xr.Dataset:
     """Classify the surface and assemble the scene. Inputs default to the files written by fetch()."""
     grid = Grid.from_config(cfg)
     if naip is None:
         z = np.load(out_path(cfg, "rasters"))
         naip, hag, dtm = z["naip"], z["hag"], z["dtm"]
+        chm = z["chm"] if "chm" in z else None
         meta = json.loads(str(z["meta"]))
     if buildings_df is None:
         buildings_df = overture.load(out_path(cfg, "buildings"))
         roads_df = overture.load(out_path(cfg, "roads"))
     meta = meta or {}
 
+    if chm is None:
+        chm = np.full(grid.shape, np.nan, dtype="float32")
+    # Vegetation height: lidar where it exists, else the canopy height map. Roofs use lidar only,
+    # because the canopy model is not trained on buildings.
+    veg_h = np.where(np.isnan(hag), chm, hag).astype("float32")
+    canopy_source = ("3DEP lidar" if np.mean(~np.isnan(hag)) > 0.5
+                     else "Meta/WRI canopy height map" if np.mean(~np.isnan(chm)) > 0.5 else "none")
+
     bid, ov_h = rasterize.buildings(buildings_df, grid)
     road = rasterize.roads(roads_df, grid, cfg["classify"]["road_width_m"])
-    classes, notes = C.classify(naip, hag, bid, road, cfg["classify"])
+    classes, notes = C.classify(naip, veg_h, bid, road, cfg["classify"])
     b_h = C.building_heights(bid, hag, ov_h, cfg["default_building_height_m"])
-    t_h = C.canopy_height(classes, hag)
+    t_h = C.canopy_height(classes, veg_h)
     mats = C.material_maps(classes, cfg["materials"])
 
     x, y = grid.coords()
@@ -71,6 +88,7 @@ def build(cfg: dict, naip=None, hag=None, dtm=None, buildings_df=None, roads_df=
             "building_height": (dims, b_h),
             "canopy_height": (dims, t_h),
             "height_above_ground": (dims, hag.astype("float32")),
+            "canopy_height_map": (dims, chm.astype("float32")),
             "terrain": (dims, dtm.astype("float32")),
             "road": (dims, road),
             **{k: (dims, v) for k, v in mats.items()},
@@ -83,12 +101,13 @@ def build(cfg: dict, naip=None, hag=None, dtm=None, buildings_df=None, roads_df=
             "transform": list(grid.transform)[:6],
             "classes": json.dumps(C.CODE),
             "sources": json.dumps(meta),
-            "lidar_fraction": notes["lidar_fraction"],
+            "lidar_fraction": float(np.mean(~np.isnan(hag))),
+            "canopy_source": canopy_source,
         },
     )
     ds["surface_class"].attrs["flag_meanings"] = " ".join(C.CLASSES)
     ds["surface_class"].attrs["flag_values"] = list(C.CODE.values())
-    for v in ("building_height", "canopy_height", "height_above_ground", "terrain"):
+    for v in ("building_height", "canopy_height", "height_above_ground", "canopy_height_map", "terrain"):
         ds[v].attrs["units"] = "m"
 
     if write:
@@ -132,6 +151,7 @@ def summarize(ds: xr.Dataset, table: pd.DataFrame) -> dict:
                  "shape": list(cls.shape)},
         "valid_fraction": round(float(valid.mean()), 4),
         "lidar_fraction": round(float(ds.attrs["lidar_fraction"]), 4),
+        "canopy_source": ds.attrs["canopy_source"],
         "class_fractions": frac,
         "buildings": int(len(np.unique(ds["building_id"].values)) - 1),
         "building_height_m": {"median": round(float(np.nanmedian(bh)), 2) if np.isfinite(bh).any() else None,

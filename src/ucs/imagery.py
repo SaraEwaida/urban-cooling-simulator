@@ -1,4 +1,6 @@
-"""NAIP aerial imagery and USGS 3DEP lidar rasters from Microsoft Planetary Computer (free, anonymous).
+"""Rasters onto the scene grid, all free and anonymous:
+NAIP imagery, 3DEP lidar and Copernicus DEM from Microsoft Planetary Computer, and the
+Meta/WRI 1 m global canopy height map from the AWS Open Data registry.
 
 Every source is warped straight onto the scene grid with GDAL (WarpedVRT), so only the
 needed part of each cloud-optimised GeoTIFF is downloaded.
@@ -93,3 +95,36 @@ def fetch_lidar(grid: Grid, collection: str) -> tuple[np.ndarray, dict]:
         "coverage": float(np.mean(~np.isnan(arr[0]))),
     }
     return arr[0], meta
+
+
+CHM_ROOT = "https://dataforgood-fb-data.s3.amazonaws.com/forests/v1/alsgedi_global_v6_float"
+
+
+def chm_tiles(bbox, cache_path) -> list[str]:
+    """Names of the canopy-height tiles intersecting a lon/lat box (tile index cached locally)."""
+    import json
+    from pathlib import Path
+
+    import requests
+    import shapely
+
+    cache_path = Path(cache_path)
+    if not cache_path.exists():
+        r = requests.get(f"{CHM_ROOT}/tiles.geojson", timeout=300)
+        r.raise_for_status()
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_bytes(r.content)
+    feats = json.loads(cache_path.read_text(encoding="utf-8"))["features"]
+    box = shapely.box(*bbox)
+    return [f["properties"]["tile"] for f in feats if shapely.geometry.shape(f["geometry"]).intersects(box)]
+
+
+def fetch_canopy_height(grid: Grid, cache_path) -> tuple[np.ndarray, dict]:
+    """Meta/WRI canopy height (m, about 1 m, from Maxar imagery) averaged onto the grid."""
+    tiles = chm_tiles(grid.bbox_wgs84(), cache_path)
+    out = np.full(grid.shape, np.nan, dtype="float32")
+    for t in tiles:
+        arr = warp_to_grid(f"{CHM_ROOT}/chm/{t}.tif", grid, [1], Resampling.average, -1)[0]
+        take = np.isnan(out) & ~np.isnan(arr)
+        out[take] = arr[take]
+    return out, {"tiles": tiles, "coverage": float(np.mean(~np.isnan(out)))}

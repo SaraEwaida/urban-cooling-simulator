@@ -68,3 +68,15 @@ def test_written_outputs(cfg, synthetic):
     assert np.allclose(fr, 1)
     path = plots.scene_figure(ds.load(), cfg, cfg["paths"]["scene_figure"], table)
     assert open(path, "rb").read(4) == b"\x89PNG"
+
+
+def test_canopy_height_map_replaces_missing_lidar(cfg, synthetic):
+    chm = synthetic["hag"].copy()
+    chm[40:60, 60:80] = 12.0  # the canopy model sees the roof as tall; it must not set roof height
+    no_lidar = dict(synthetic, hag=np.full_like(synthetic["hag"], np.nan), chm=chm)
+    ds = scene.build(cfg, **no_lidar, write=False)
+    cls = ds["surface_class"].values
+    assert cls[20, 20] == C.CODE["tree"] and cls[5, 40] == C.CODE["grass"]
+    assert np.nanmedian(ds["canopy_height"].values) == 8.0
+    assert np.nanmedian(ds["building_height"].values) == 7.0  # Overture floors, not the canopy map
+    assert ds.attrs["canopy_source"] == "Meta/WRI canopy height map"
