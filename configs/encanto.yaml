@@ -56,3 +56,18 @@ paths:
   geohash_table: outputs/geohash_cells.csv
   scene_summary: outputs/scene_summary.json
   scene_figure: outputs/figures/encanto_scene.png
+  sun: data/encanto/sun.zarr
+  geohash_sun: outputs/geohash_sun.csv
+  sun_summary: outputs/sun_summary.json
+  sun_figure: outputs/figures/encanto_sun.png
+
+# Milestone 2: sun and shade
+sun:
+  date: "2023-07-15"              # a clear midsummer day (used again for the energy balance)
+  utc_offset_h: -7                # Arizona: MST all year, no daylight saving
+  hours_local: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+  tree_transmissivity: 0.25       # share of direct sun passing through a crown
+  max_shadow_m: 300               # longest shadow traced
+  svf_directions: 32
+  svf_radius_m: 100
+  map_hours: [9, 15]              # hours shown in the figure

@@ -8,8 +8,8 @@ The study area is a 2 x 2 km square around Encanto Park in central Phoenix: a pa
 
 | Milestone | Content | State |
 |---|---|---|
-| 1. Scene builder | Buildings, roads, aerial imagery and lidar on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
-| 2. Sun and shade | Sun position, building and tree shadows, sky view factor | next |
+| 1. Scene builder | Buildings, roads, water, aerial imagery and heights on a 2 m grid; surface classes, heights and materials; geohash summary; Zarr | done |
+| 2. Sun and shade | Sun position, hourly building and tree shadows, sky view factor | done (results pending) |
 | 3. Energy balance | Surface temperature from radiation, convection, storage and evaporation, with ERA5 forcing and wind sheltering | planned |
 | 4. Validation | Simulated surface temperature against Landsat Collection 2 surface temperature | planned |
 | 5. Interventions | Trees, shade sails, cool roofs, porous paving; cooling maps and per-geohash tables | planned |
@@ -42,6 +42,13 @@ Planetary Computer is read anonymously; only the part of each cloud-optimised Ge
 4. **Materials.** Each class gets an albedo, a thermal emissivity and a relative evaporative fraction (`configs/encanto.yaml`), used by the energy balance in milestone 3.
 5. **Geohash summary.** Every pixel is tagged with its precision-8 geohash (about 38 x 19 m); the table gives class fractions, mean albedo and mean building and canopy height per cell.
 
+## Method (milestone 2: sun and shade)
+
+1. **Sun position** from the NOAA solar calculator equations, with refraction. Checked against NREL's Solar Position Algorithm (pvlib) over a full year at Encanto: within 0.02 degrees in elevation and 0.03 degrees in azimuth.
+2. **Shadows.** For each hour of the chosen day (15 July 2023, 06:00-19:00 MST; Arizona does not use daylight saving) a ray is marched from every pixel towards the sun over the building and canopy height rasters. A pixel's top surface (roof, crown or ground) is in full sun, in tree shade (25% of the direct beam passes through a crown), or in building shadow. Shadows are traced up to 300 m.
+3. **Sky view factor**, the share of the sky hemisphere a surface sees, which controls how fast it cools by long-wave radiation at night: horizon angles in 32 directions out to 100 m, SVF = mean of cos^2(horizon angle). Tree crowns count as solid. Distances are measured to the near edge of the obstructing pixel; for an infinite street canyon with H/W = 1 the result at the centre matches the analytical value cos(atan(2H/W)) = 0.447 (Oke 1981) to within 0.003.
+4. The scene is treated as flat: the terrain varies by a few metres across 2 km, far less than the buildings and trees. Pixels near the scene edge do not see obstructions outside it.
+
 ## Scene result (Encanto, 2 x 2 km)
 
 ![Encanto scene](docs/encanto_scene.png)
@@ -73,6 +80,7 @@ pytest -q
 ```powershell
 ucs fetch    # Overture vectors, NAIP and lidar onto the grid (a few minutes, needs internet)
 ucs scene    # classes, heights, materials -> data/encanto/scene.zarr, geohash table, summary, figure
+ucs sun      # hourly shade and sky view factor -> data/encanto/sun.zarr, geohash table, summary, figure
 ```
 
 Outputs:
@@ -81,10 +89,16 @@ Outputs:
 - `outputs/geohash_cells.csv`: per-geohash class fractions, albedo and heights.
 - `outputs/scene_summary.json`: class fractions, building count, heights, source items and dates.
 - `outputs/figures/encanto_scene.png`: imagery, classes, heights and tree cover per geohash.
+- `data/encanto/sun.zarr`: hourly sunlit share (`time, y, x`), sunlit hours, sky view factor, sun elevation and azimuth.
+- `outputs/geohash_sun.csv`: per-geohash sky view factor, sunlit hours (all surfaces and ground only) and shade at 09:00 and 15:00.
+- `outputs/sun_summary.json`: sun path for the day and sunlit hours and sky view factor by surface class.
+- `outputs/figures/encanto_sun.png`: shade at 09:00 and 15:00, hours of direct sun, sky view factor.
 
 ## Tests
 
-Tests run offline on a synthetic 200 m scene (grass with a tree clump, bare ground, a building, a road and a pond) and check the geohash encoder against published reference values, grid snapping, every class rule, the roof height fallbacks, material lookup and the written Zarr, table and figure.
+Sun and shade tests: solstice noon elevation (90 - latitude + 23.44 degrees) and Arizona solar noon, a morning sun in the east and none at night, the shadow length of a 10 m block at a 45 degree sun, partial tree shade with buildings taking precedence, sky view factor 1 on open ground and the analytical street canyon value, and the written Zarr, table and figure.
+
+Scene tests run offline on a synthetic 200 m scene (grass with a tree clump, bare ground, a building, a road and a pond) and check the geohash encoder against published reference values, grid snapping, every class rule, the roof height fallbacks, material lookup and the written Zarr, table and figure.
 
 ## Layout
 
@@ -97,6 +111,9 @@ src/ucs/imagery.py        NAIP and 3DEP lidar from Planetary Computer, warped on
 src/ucs/rasterize.py      footprints and buffered roads onto the grid
 src/ucs/classify.py       surface classes, heights, material maps
 src/ucs/scene.py          fetch and build steps, Zarr, geohash table, summary
-src/ucs/plots.py          scene figure
-src/ucs/cli.py            `ucs fetch | scene | all`
+src/ucs/solar.py          sun elevation and azimuth (NOAA equations)
+src/ucs/shade.py          ray-marched shadows and sky view factor
+src/ucs/sun.py            hourly shade over a day, geohash table, summary
+src/ucs/plots.py          scene and sun figures
+src/ucs/cli.py            `ucs fetch | scene | sun | all`
 ```

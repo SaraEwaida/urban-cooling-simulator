@@ -86,3 +86,44 @@ def scene_figure(ds, cfg: dict, path, table=None):
     fig.savefig(path, dpi=110)
     plt.close(fig)
     return path
+
+
+def sun_figure(sun, cfg: dict, path):
+    import pandas as pd
+
+    grid = Grid.from_config(cfg)
+    ext = _extent(grid)
+    fig, axes = plt.subplots(2, 2, figsize=(12, 11.5), constrained_layout=True)
+    times = pd.DatetimeIndex(sun.time.values)
+    shade_cmap = ListedColormap(["#1f1f1f", "#7a8f6a", "#f4e3b5"])
+    shade_norm = BoundaryNorm([-1, 1, 99, 101], 3)
+    for ax, h in zip(axes[0], cfg["sun"]["map_hours"]):
+        i = cfg["sun"]["hours_local"].index(h)
+        s = sun["sunlit"].values[i]
+        ax.imshow(s, cmap=shade_cmap, norm=shade_norm, extent=ext, interpolation="nearest")
+        el, az = float(sun.sun_elevation[i]), float(sun.sun_azimuth[i])
+        ax.set_title(f"{times[i]:%H:%M} local: sun {el:.0f} deg up, from {az:.0f} deg")
+        shares = [np.mean(s == 0), np.mean((s > 0) & (s < 100)), np.mean(s == 100)]
+        ax.legend(handles=[Patch(color=c, label=f"{l} {v:.0%}") for c, l, v in
+                           zip(shade_cmap.colors, ["building shadow", "tree shade", "full sun"], shares)],
+                  loc="lower left", fontsize=8, framealpha=0.9)
+
+    ax = axes[1, 0]
+    im = ax.imshow(sun["sunlit_hours"].values, cmap="YlOrRd", vmin=0, extent=ext, interpolation="nearest")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="hours of direct sun")
+    ax.set_title(f"Direct sun over the day, {cfg['sun']['date']}")
+
+    ax = axes[1, 1]
+    im = ax.imshow(sun["sky_view_factor"].values, cmap="cividis", vmin=0, vmax=1, extent=ext,
+                   interpolation="nearest")
+    fig.colorbar(im, ax=ax, shrink=0.8, label="sky view factor")
+    ax.set_title("Sky view factor (1 = open sky)")
+
+    for ax in axes.flat:
+        ax.set_xlabel("km east")
+        ax.set_ylabel("km north")
+    fig.suptitle(f"{cfg['name'].title()} sun and shade, {cfg['sun']['date']} ({sun.attrs['time_zone']})",
+                 fontsize=13)
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return path
